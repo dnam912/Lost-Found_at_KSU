@@ -7,6 +7,18 @@
 
 import SwiftUI
 
+// MARK: - Theme
+enum KSU {
+    static let gold = Color(red: 1.0, green: 0.78, blue: 0.0)
+    static let black = Color(red: 0.08, green: 0.08, blue: 0.09)
+    static let cardBackground = Color(.secondarySystemBackground)
+    static let background = LinearGradient(
+        colors: [Color(.systemBackground), Color(.secondarySystemBackground)],
+        startPoint: .top,
+        endPoint: .bottom
+    )
+}
+
 // MARK: - Models
 struct LostItem: Identifiable {
     let id = UUID()
@@ -61,30 +73,59 @@ struct ContentView: View {
     
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(lostItems) { item in
-                    NavigationLink(destination: ItemDetailView(item: item)) {
-                        LostItemRow(item: item)
+            ZStack {
+                KSU.background.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Header banner
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("KSU LOST & FOUND")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .tracking(2)
+                                .foregroundStyle(KSU.gold)
+                            Text("Reunite items with owners")
+                                .font(.title2.bold())
+                                .foregroundStyle(.primary)
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+
+                        LazyVStack(spacing: 14) {
+                            ForEach(lostItems) { item in
+                                NavigationLink(destination: ItemDetailView(item: item)) {
+                                    LostItemRow(item: item)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 24)
                     }
                 }
             }
-            .navigationTitle("Lost & Found")
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(action: {}) {
                         Text("Login")
                             .font(.subheadline)
                             .fontWeight(.semibold)
+                            .foregroundStyle(KSU.black)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: {}) {
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
+                            .foregroundStyle(KSU.gold)
                     }
                 }
             }
         }
+        .tint(KSU.gold)
     }
 }
 
@@ -93,20 +134,25 @@ struct LostItemRow: View {
     let item: LostItem
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             Image(systemName: item.imageName)
-                .font(.largeTitle)
-                .foregroundStyle(.blue)
-                .frame(width: 50, height: 50)
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
+                .font(.title2)
+                .foregroundStyle(KSU.black)
+                .frame(width: 56, height: 56)
+                .background(KSU.gold.opacity(0.25))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
                     .font(.headline)
-                Text(item.location)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(KSU.gold)
+                    Text(item.location)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Text(item.datePosted)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -114,17 +160,31 @@ struct LostItemRow: View {
             
             Spacer()
             
-            if !item.comments.isEmpty {
-                HStack(spacing: 4) {
-                    Image(systemName: "bubble.right")
-                        .font(.caption)
-                    Text("\(item.comments.count)")
-                        .font(.caption)
+            VStack(spacing: 6) {
+                if !item.comments.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "bubble.right.fill")
+                            .font(.caption2)
+                        Text("\(item.comments.count)")
+                            .font(.caption2)
+                    }
+                    .foregroundStyle(.secondary)
                 }
-                .foregroundStyle(.secondary)
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
         }
-        .padding(.vertical, 4)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(KSU.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(KSU.gold.opacity(0.15), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 3)
     }
 }
 
@@ -134,86 +194,96 @@ struct ItemDetailView: View {
     @State private var newComment = ""
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Image
-                Image(systemName: item.imageName)
-                    .font(.system(size: 100))
-                    .foregroundStyle(.blue)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 250)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
-                
-                // Item Info
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(item.title)
-                        .font(.title2)
-                        .fontWeight(.bold)
+        ZStack {
+            KSU.background.ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Image
+                    Image(systemName: item.imageName)
+                        .font(.system(size: 90))
+                        .foregroundStyle(KSU.black)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 220)
+                        .background(KSU.gold.opacity(0.25))
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     
-                    HStack(spacing: 8) {
-                        Image(systemName: "mappin.circle.fill")
-                            .foregroundStyle(.red)
-                        Text(item.location)
+                    // Item Info
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(item.title)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        
+                        HStack(spacing: 8) {
+                            Image(systemName: "mappin.circle.fill")
+                                .foregroundStyle(KSU.gold)
+                            Text(item.location)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        Text(item.description)
+                            .font(.body)
+                            .lineLimit(nil)
+                        
+                        Text(item.datePosted)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .padding(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(KSU.cardBackground)
+                    )
                     
-                    Text(item.description)
-                        .font(.body)
-                        .lineLimit(nil)
-                    
-                    Text(item.datePosted)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                
-                Divider()
-                
-                // Comments Section
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Comments (\(item.comments.count))")
-                        .font(.headline)
-                    
-                    if item.comments.isEmpty {
-                        Text("No comments yet. Be the first to help!")
-                            .foregroundStyle(.secondary)
-                            .font(.body)
-                    } else {
-                        VStack(spacing: 12) {
-                            ForEach(item.comments) { comment in
-                                CommentView(comment: comment)
+                    // Comments Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Comments (\(item.comments.count))")
+                            .font(.headline)
+                        
+                        if item.comments.isEmpty {
+                            Text("No comments yet. Be the first to help!")
+                                .foregroundStyle(.secondary)
+                                .font(.body)
+                        } else {
+                            VStack(spacing: 12) {
+                                ForEach(item.comments) { comment in
+                                    CommentView(comment: comment)
+                                }
                             }
                         }
                     }
-                }
-                
-                Divider()
-                
-                // Add Comment
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Leave a Comment")
-                        .font(.headline)
                     
-                    HStack(spacing: 8) {
-                        TextField("Did you find it?", text: $newComment)
-                            .textFieldStyle(.roundedBorder)
+                    // Add Comment
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Leave a Comment")
+                            .font(.headline)
                         
-                        Button(action: {
-                            newComment = ""
-                        }) {
-                            Image(systemName: "paperplane.fill")
-                                .foregroundStyle(.blue)
+                        HStack(spacing: 8) {
+                            TextField("Did you find it?", text: $newComment)
+                                .textFieldStyle(.roundedBorder)
+                            
+                            Button(action: {
+                                newComment = ""
+                            }) {
+                                Image(systemName: "paperplane.fill")
+                                    .foregroundStyle(.white)
+                                    .padding(10)
+                                    .background(KSU.gold)
+                                    .clipShape(Circle())
+                            }
+                            .disabled(newComment.isEmpty)
+                            .opacity(newComment.isEmpty ? 0.5 : 1)
                         }
-                        .disabled(newComment.isEmpty)
                     }
+                    
+                    Spacer(minLength: 20)
                 }
-                
-                Spacer(minLength: 20)
+                .padding()
             }
-            .padding()
         }
         .navigationTitle("Item Details")
         .navigationBarTitleDisplayMode(.inline)
+        .tint(KSU.gold)
     }
 }
 
@@ -236,8 +306,12 @@ struct CommentView: View {
                 .foregroundStyle(.primary)
         }
         .padding(12)
-        .background(Color(.systemGray6))
-        .cornerRadius(8)
+        .background(KSU.cardBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(KSU.gold.opacity(0.15), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 

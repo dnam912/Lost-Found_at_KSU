@@ -1,0 +1,51 @@
+User
+-------------------------
+user_id             UUID    PK
+email               TEXT    UNIQUE
+role                TEXT    student / admin / (admin)
+created_at          TIMESTAMPTZ
+
+
+Item
+-------------------------
+item_id             UUID    PK
+category            TEXT
+primary_color       TEXT
+material            TEXT
+description_raw     TEXT
+created_at          TIMESTAMPTZ
+
+
+Report
+-------------------------
+report_id            UUID    PK
+user_id              UUID    FK -> User.user_id
+item_id              UUID    FK -> Item.item_id
+status               TEXT    lost / found
+report_date          DATE
+estimated_time_start TIME
+estimated_time_end   TIME
+location             TEXT
+area                 TEXT
+created_at           TIMESTAMPTZ
+updated_at           TIMESTAMPTZ
+
+
+ItemImage
+-------------------------
+image_id             UUID    PK
+item_id              UUID    FK -> Item.item_id
+image_url            TEXT
+image_type           TEXT    photo / sketch
+embedding            TEXT    temporary, later vector
+created_at           TIMESTAMPTZ
+
+
+ExtractedFeature
+-------------------------
+feature_id           UUID    PK
+item_id              UUID    FK -> Item.item_id
+feature_type         TEXT
+feature_value        TEXT
+visibility           TEXT    public / private
+created_at           TIMESTAMPTZ

@@ -25,9 +25,20 @@ struct LostItem: Identifiable {
     let title: String
     let description: String
     let imageName: String
+    /// Optional asset catalog image name for a real reference photo
+    /// (used for on-device Vision image matching). If nil, `imageName`
+    /// is treated as an SF Symbol.
+    var imageAssetName: String? = nil
     let location: String
     let datePosted: String
     var comments: [Comment] = []
+
+    /// The actual reference photo, if this item has one, for use with
+    /// Vision's feature print matching.
+    var referenceImage: UIImage? {
+        guard let imageAssetName else { return nil }
+        return UIImage(named: imageAssetName)
+    }
 }
 
 struct Comment: Identifiable {
@@ -68,8 +79,19 @@ struct ContentView: View {
             location: "Gym - Locker Room",
             datePosted: "2 days ago",
             comments: []
+        ),
+        LostItem(
+            title: "White AirPods Case (Found)",
+            description: "Found on a desk, plain white AirPods case",
+            imageName: "airpodsmax",
+            imageAssetName: "foundAirpodsCase",
+            location: "Turned in at Student Center Front Desk",
+            datePosted: "Today at 11:15 AM",
+            comments: []
         )
     ]
+
+    @State private var showMatchTest = false
     
     var body: some View {
         NavigationStack {
@@ -117,7 +139,7 @@ struct ContentView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: {}) {
+                    Button(action: { showMatchTest = true }) {
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
                             .foregroundStyle(KSU.gold)
@@ -126,6 +148,9 @@ struct ContentView: View {
             }
         }
         .tint(KSU.gold)
+        .sheet(isPresented: $showMatchTest) {
+            PhotoMatchTestView(candidateItems: lostItems)
+        }
     }
 }
 
@@ -135,12 +160,7 @@ struct LostItemRow: View {
     
     var body: some View {
         HStack(spacing: 14) {
-            Image(systemName: item.imageName)
-                .font(.title2)
-                .foregroundStyle(KSU.black)
-                .frame(width: 56, height: 56)
-                .background(KSU.gold.opacity(0.25))
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            itemThumbnail
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
@@ -186,6 +206,24 @@ struct LostItemRow: View {
         )
         .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 3)
     }
+
+    @ViewBuilder
+    private var itemThumbnail: some View {
+        if let referenceImage = item.referenceImage {
+            Image(uiImage: referenceImage)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 56, height: 56)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        } else {
+            Image(systemName: item.imageName)
+                .font(.title2)
+                .foregroundStyle(KSU.black)
+                .frame(width: 56, height: 56)
+                .background(KSU.gold.opacity(0.25))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+    }
 }
 
 // MARK: - Detail View
@@ -200,13 +238,22 @@ struct ItemDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     // Image
-                    Image(systemName: item.imageName)
-                        .font(.system(size: 90))
-                        .foregroundStyle(KSU.black)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 220)
-                        .background(KSU.gold.opacity(0.25))
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    if let referenceImage = item.referenceImage {
+                        Image(uiImage: referenceImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 220)
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    } else {
+                        Image(systemName: item.imageName)
+                            .font(.system(size: 90))
+                            .foregroundStyle(KSU.black)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 220)
+                            .background(KSU.gold.opacity(0.25))
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }
                     
                     // Item Info
                     VStack(alignment: .leading, spacing: 12) {

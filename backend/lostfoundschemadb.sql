@@ -1,12 +1,12 @@
--- Init schema: extensions, tables, auth signup, RLS, and item_images storage.
+-- db schema: extensions, tables, auth signup, RLS, and item_images storage.
 
--- 1. EXTENSIONS
+-- EXTENSIONS
 create extension if not exists pgcrypto with schema extensions;
 create extension if not exists vector with schema extensions;
 
 set search_path = public, extensions;
 
--- 2. TABLES
+-- TABLES
 create table public.users (
   user_id uuid primary key references auth.users (id) on delete cascade,
   email text not null unique,
@@ -76,7 +76,7 @@ create table public.extracted_features (
 create index extracted_features_item_id_idx on public.extracted_features (item_id);
 create index extracted_features_visibility_idx on public.extracted_features (visibility);
 
--- 3. FUNCTIONS & TRIGGERS
+-- FUNCTIONS & TRIGGERS
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -126,7 +126,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- 4. ROW LEVEL SECURITY
+-- ROW LEVEL SECURITY
 alter table public.users enable row level security;
 alter table public.items enable row level security;
 alter table public.reports enable row level security;
@@ -200,7 +200,7 @@ create policy extracted_features_insert_via_own_report
     )
   );
 
--- 5. STORAGE BUCKET & STORAGE POLICIES
+-- STORAGE BUCKET & STORAGE POLICIES
 insert into storage.buckets (id, name, public)
 values ('item_images', 'item_images', true)
 on conflict (id) do nothing;

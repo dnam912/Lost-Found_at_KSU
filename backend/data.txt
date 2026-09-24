@@ -2,7 +2,7 @@ User
 -------------------------
 user_id             UUID    PK
 email               TEXT    UNIQUE
-role                TEXT    student / admin / (admin)
+role                TEXT    student / faculty / (admin)
 created_at          TIMESTAMPTZ
 
 

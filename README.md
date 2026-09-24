@@ -1,10 +1,20 @@
 # Lost-Found_at_KSU
 
 Folders:
-- web
-- iOS
-- nlp
-- backend
+[ web ]
+    index.html
+[ iOS ]
+    SwiftUI
+[ backend ]
+    [ server ]
+        main.py
+        [ api ]
+        [ cdn ]
+        [ db ]
+        [ vector ]
+[ nlp ]
+    spacy_nlp.py
+
 
 
 // How to Set up a Virtual Environment

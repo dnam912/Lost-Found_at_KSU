@@ -14,13 +14,12 @@ I think I left my black leather wallet somewhere in the student center yesterday
 """
 '''
 
+nlp = spacy.load("en_core_web_sm")
 
 
 def process_with_spacey(text):
 
     # ======== ======== spaCy ======== ========
-    nlp = spacy.load("en_core_web_sm")
-
     doc = nlp(text)
 
     # ======== ======== Tokens ======== ========
@@ -88,17 +87,24 @@ def process_with_spacey(text):
 
         return features
 
-
-
-
     # Run feature extraction once
     features = extract_features(doc)
 
-    # ======== ======== Extracted Feature Output ======== ========
 
+
+    # ======== ======== Extracted Feature Output ======== ========
     print("\nEXTRACTED FEATURES")
     print("-" * 40)
+    print("Entities:", features["entities"])
+    print("Nouns:", features["nouns"])
+    print("Adjectives:", features["adjectives"])
 
+
+    # Return Data for API responses
+    return features
+
+
+    '''
     print("\nEntities:")
     if features["entities"]:
         for entity in features["entities"]:
@@ -118,6 +124,6 @@ def process_with_spacey(text):
 
 
     print()
-
+    '''
 
 

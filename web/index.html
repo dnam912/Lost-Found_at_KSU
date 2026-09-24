@@ -1,1 +1,65 @@
-.
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+
+<h1>Lost & Found</h1>
+<p>Enter a description here</p>
+<body>
+
+    <textarea id="description_raw" name="item" rows="15" cols="40"></textarea>
+
+    <!-- Using Vanilla JavaScript with Textarea HTML
+        Reference: https://mimo.org/glossary/html/textarea -->
+
+
+    <button onclick="sendRawDescription()">Submit</button>
+    <!-- TEST <button onclick="callHelloWorld()">HELLO SERVER</button> -->
+
+
+    <h2>Parsing Output</h2>
+    <div id="output" style="background-color: #f4f4f4; padding: 10px; border-radius: 5px;">
+        <pre id="json_result">Waiting for input..</pre>
+    </div>
+
+
+
+    <script>
+        async function sendRawDescription() {
+            const textareaValue = document.getElementById("description_raw").value;
+
+            // (Text + Image file)
+            const formData = new FormData();
+            formData.append("text", textareaValue);
+
+            try {
+                // Send POST to a FastAPI Server
+                const response = await fetch("http://127.0.0.1:8000/api/process", {
+                    method: "POST",
+                    body: formData
+                });
+
+                // Parse a HTTP response to a JSON
+                const result = await response.json();
+                console.log("Result:", result);
+
+
+
+                if (result.status === "success") {
+                    document.getElementById("json_result").innerText = JSON.stringify(result.parsed_data, null, 2);
+                }
+                
+            } catch (error) {
+                console.error("SERVER ERROR:", error);
+            }
+        }
+
+
+    </script>
+
+
+</body>
+</html>

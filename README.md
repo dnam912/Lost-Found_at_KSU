@@ -1,12 +1,27 @@
 # Lost-Found_at_KSU
 
-Folders:
-- web
-- iOS
-- nlp
-- backend
+### Project Structure
+```text
+.
+├── web/
+│   └── index.html
+├── iOS/
+│   └── SwiftUI/
+├── backend/
+│   └── server/
+│       ├── main.py
+│       ├── api/
+│       ├── cdn/
+│       ├── db/
+│       └── vector/
+└── nlp/
+    └── spacy_nlp.py
+```
 
 
+
+### How to Set up a Virtual Environment for Running a Server and spaCy (NLP)
+```bash
 # 1. Create a virtual environment at the project root
 python -m venv .venv
 
@@ -21,3 +36,4 @@ pip install -r requirements.txt
 
 # 5. Download required spaCy NLP English model
 python -m spacy download en_core_web_sm
+```

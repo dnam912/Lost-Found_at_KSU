@@ -20,9 +20,32 @@
 
 
 
+### How to Run a Server
+**MacOS / Linux**
+```bash
+# 1. Activate the virtual environment
+source .venv/bin/activate
+
+# 2. Start FastAPI + Uvicorn Server
+uvicorn main:app --reload
+```
+
+**Windows (Powershell)**
+```bash
+# 1. Activate the virtual environment
+# (Note: If using Git Bash on Windows, run source .venv/Scripts/activate)
+.\.venv\Scripts\Activate.ps1
+
+# 2. Start FastAPI + Uvicorn Server
+uvicorn main:app --reload
+```
+
+
+
 ### How to Set up a Virtual Environment for Running a Server and spaCy (NLP)
 ```bash
-# 1. Create a virtual environment at the project root
+# 1-1. Check if Python 3.11 or higher is installed
+# 1-2. Create a virtual environment at the project root
 python -m venv .venv
 
 # 2. Activate the virtual environment

@@ -10,16 +10,82 @@
 <p>Enter a description here</p>
 <body>
 
-    <textarea id="description_raw" name="item" rows="15" cols="40"></textarea>
+
+    <!-- ===== ===== Keywords ===== ===== -->
+    <div style="display: flex; flex-direction: column; gap: 12px; max-width: 400px; margin-bottom: 15px;">
+
+        <!-- Image Upload -->
+        <div>
+            <label for="image_file"><strong>Image Upload:</strong></label><br>
+            <input type="file" id="image_file" accept="image/png, image/jpeg, image/jpg" />
+        </div>
+
+        <!-- Status Selection -->
+        <div>
+            <strong>Status:</strong><br>
+            <label><input type="radio" name="item_status" value="Lost" checked> Lost</label>
+            <label><input type="radio" name="item_status" value="Found"> Found</label>
+        </div>
+
+        <!-- Location Dropdown -->
+        <div>
+            <label for="location_select"><strong>Location:</strong></label><br>
+            <select id="location_select">
+                <option value="Student Center">Student Center</option>
+                <option value="Math and Science Building">Math and Science Building</option>
+                <option value="Library">Library</option>
+            </select>
+        </div>
+
+        <!-- Date -->
+        <div>
+            <strong>Date:</strong><br>
+            <label for="estimated_date">Date (mm/dd/yyyy):</label><br>
+            <input type="text" id="estimated_date" placeholder="MM/DD/YYYY" /><br><br>
+        </div>
+
+        <!-- Estimated Time (Start & End) -->
+        <div>
+            <strong>Estimated Time Range:</strong><br>
+            <label for="estimated_start">Start:</label>
+            <input type="time" id="estimated_start" /><br>
+            <label for="estimated_end">End:</label>
+            <input type="time" id="estimated_end" />
+        </div>
+
+        <!-- Category -->
+         <div>
+            <label for="category_input"><strong>Category:</strong></label><br>
+            <input type="text" id="category_input" placeholder="e.g. Wallet, Electronics, Keys" />
+        </div>
+
+        <!-- Color -->
+        <div>
+            <label for="color_input"><strong>Color:</strong></label><br>
+            <input type="text" id="color_input" placeholder="e.g. Black, Navy, Silver" />
+        </div>
+
+        <!-- Material -->
+        <div>
+            <label for="material_input"><strong>Material:</strong></label><br>
+            <input type="text" id="material_input" placeholder="e.g. Leather, Plastic, Metal" />
+        </div>
+
+    </div>
+
+    <!-- ===== ===== Description ===== ===== -->
 
     <!-- Using Vanilla JavaScript with Textarea HTML
-        Reference: https://mimo.org/glossary/html/textarea -->
-
+        Reference: https://mimo.org/glossary/html/textarea
+    -->
+    <label for="description_raw"><strong>Description:</strong></label><br>
+    <textarea id="description_raw" name="item" rows="15" cols="40"></textarea>
 
     <button onclick="sendRawDescription()">Submit</button>
-    <!-- TEST <button onclick="callHelloWorld()">HELLO SERVER</button> -->
 
 
+
+    <!-- ===== ===== Show a Form Result ===== ===== -->
     <h2>Parsing Output</h2>
     <div id="output" style="background-color: #f4f4f4; padding: 10px; border-radius: 5px;">
         <pre id="json_result">Waiting for input..</pre>
@@ -27,13 +93,44 @@
 
 
 
+    <!-- ===== ===== Javascript ===== ===== -->
     <script>
         async function sendRawDescription() {
+            // Metadata (Keywords)
+            const statusValue = document.querySelector('input[name="item_status"]:checked').value;
+            const locationValue = document.getElementById("location_select").value;
+            const dateValue = document.getElementById("estimated_date").value;
+            const startValue = document.getElementById("estimated_start").value;
+            const endValue = document.getElementById("estimated_end").value;
+            const categoryValue = document.getElementById("category_input").value;
+            const colorValue = document.getElementById("color_input").value;
+            const materialValue = document.getElementById("material_input").value;
+
+
+            // Text Description
             const textareaValue = document.getElementById("description_raw").value;
+
+            // Image
+            const imageFileInput = document.getElementById("image_file");
+
 
             // (Text + Image file)
             const formData = new FormData();
+            formData.append("status", statusValue);
+            formData.append("location", locationValue);
+            formData.append("date", dateValue);
+            formData.append("estimated_start", startValue);
+            formData.append("estimated_end", endValue);
+            formData.append("category", categoryValue);
+            formData.append("color", colorValue);
+            formData.append("material", materialValue);
+
             formData.append("text", textareaValue);
+
+            // If an image is attached, append the input
+            if (imageFileInput.files[0]) {
+                formData.append("image", imageFileInput.files[0]);
+            }
 
             try {
                 // Send POST to a FastAPI Server

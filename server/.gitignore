@@ -1,0 +1,20 @@
+# Python bytecode (covers pycache)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment files and secrets
+.env
+env/
+venv/
+.venv/
+
+# Project-specific uploads directory
+uploaded_images/
+
+# Executables, binaries, and scripts
+cloudflared.exe
+*.bat
+!install_venv.bat
+*.sh
+!install_venv.sh

@@ -2,38 +2,42 @@
 
 ### Project Structure
 ```text
-.
-├── web/
-│   └── index.html
-├── iOS/
+
+├── ios/
 │   └── SwiftUI/
-├── backend/
-│   └── server/
-│       ├── main.py
-│       ├── api/
-│       ├── cdn/
-│       ├── db/
-│       └── vector/
-└── nlp/
-    └── spacy_nlp.py
+├── server/
+│   ├── main.py
+│   ├── install_venv.sh
+│   ├── install_venv.bat
+│   ├── static/               # Web interface assets
+│   │   └── index.html
+│   ├── api/                  # API endpoints and route handlers
+│   │   └── process.py
+│   ├── db/                   # Database connections and models
+│   │   └── database.py
+│   ├── nlp/                  # Text processing and NLP (spaCy)
+│   │   └── spacy_nlp.py
+│   └── vector/               # Vector storage and embedding
+
 ```
 
 
 
-### How to Set up a Virtual Environment for Running a Server and spaCy (NLP)
+### How to Set up a Virtual Environment for Running the Lost&Found Project
 ```bash
-# 1. Create a virtual environment at the project root
-python -m venv .venv
+# Check if Python 3.11 or higher is installed
+# Create a virtual environment inside the server directory
+cd server
 
-# 2. Activate the virtual environment
-source .venv/bin/activate
+# Create virtual environment
+chmod +x install_venv.sh && ./install_venv.sh   # macOS / Linux
+# install_venv.bat    # Windows
 
-# 3. Upgrade pip
-python -m pip install --upgrade pip
+# Activate virtual environment
+source .venv/bin/activate       # macOS/Linux
+# .\.venv\Scripts\Activate.ps1  # Windows PowerShell
 
-# 4. Install project dependencies from requirements.txt
-pip install -r requirements.txt
 
-# 5. Download required spaCy NLP English model
-python -m spacy download en_core_web_sm
+# Type a URL into a web browser
+https://lost-and-found-ksu.taildfefb3.ts.net/
 ```

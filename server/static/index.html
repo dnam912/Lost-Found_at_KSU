@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+
+<h1>Lost & Found</h1>
+<p>Enter a description here</p>
+<body>
+
+
+    <!-- ===== ===== Keywords ===== ===== -->
+    <div style="display: flex; flex-direction: column; gap: 12px; max-width: 400px; margin-bottom: 15px;">
+
+        <!-- Image Upload -->
+        <div>
+            <label for="image_file"><strong>Image Upload:</strong></label><br>
+            <input type="file" id="image_file" accept="image/png, image/jpeg, image/jpg" />
+        </div>
+
+        <!-- Status Selection -->
+        <div>
+            <strong>Status:</strong><br>
+            <label><input type="radio" name="item_status" value="Lost" checked> Lost</label>
+            <label><input type="radio" name="item_status" value="Found"> Found</label>
+        </div>
+
+        <!-- Location Dropdown -->
+        <div>
+            <label for="location_select"><strong>Location:</strong></label><br>
+            <select id="location_select">
+                <option value="Student Center">Student Center</option>
+                <option value="Math and Science Building">Math and Science Building</option>
+                <option value="Library">Library</option>
+            </select>
+        </div>
+
+        <!-- Date -->
+        <div>
+            <strong>Date:</strong><br>
+            <label for="estimated_date">Date (mm/dd/yyyy):</label><br>
+            <input type="text" id="estimated_date" placeholder="MM/DD/YYYY" /><br><br>
+        </div>
+
+        <!-- Estimated Time (Start & End) -->
+        <div>
+            <strong>Estimated Time Range:</strong><br>
+            <label for="estimated_start">Start:</label>
+            <input type="time" id="estimated_start" /><br>
+            <label for="estimated_end">End:</label>
+            <input type="time" id="estimated_end" />
+        </div>
+
+        <!-- Category -->
+         <div>
+            <label for="category_input"><strong>Category:</strong></label><br>
+            <input type="text" id="category_input" placeholder="e.g. Wallet, Electronics, Keys" />
+        </div>
+
+        <!-- Color -->
+        <div>
+            <label for="color_input"><strong>Color:</strong></label><br>
+            <input type="text" id="color_input" placeholder="e.g. Black, Navy, Silver" />
+        </div>
+
+        <!-- Material -->
+        <div>
+            <label for="material_input"><strong>Material:</strong></label><br>
+            <input type="text" id="material_input" placeholder="e.g. Leather, Plastic, Metal" />
+        </div>
+
+    </div>
+
+    <!-- ===== ===== Description ===== ===== -->
+
+    <!-- Using Vanilla JavaScript with Textarea HTML
+        Reference: https://mimo.org/glossary/html/textarea
+    -->
+    <label for="description_raw"><strong>Description:</strong></label><br>
+    <textarea id="description_raw" name="item" rows="15" cols="40"></textarea>
+
+    <button onclick="sendRawDescription()">Submit</button>
+
+
+
+    <!-- ===== ===== Show a Form Result ===== ===== -->
+    <h2>Parsing Output</h2>
+    <div id="output" style="background-color: #f4f4f4; padding: 10px; border-radius: 5px;">
+        <pre id="json_result">Waiting for input..</pre>
+    </div>
+
+    <!-- ===== ===== Saved Reports ===== ===== -->
+
+    <h2>Lost & Found Reports</h2>
+
+    <div id="reports_container"
+        style="
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        ">
+    </div>
+
+    <!-- ===== ===== Javascript ===== ===== -->
+    <script>
+        function escapeHtml(value) {
+
+            return String(value)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        async function loadReports() {
+
+    const container = document.getElementById("reports_container");
+
+    container.innerHTML = "Loading...";
+
+    try {
+
+        const response = await fetch("/api/reports");
+
+        if (!response.ok) {
+            throw new Error("Failed to load reports");
+        }
+
+        const reports = await response.json();
+
+        container.innerHTML = "";
+
+        if (reports.length === 0) {
+            container.innerHTML = "<p>No reports yet.</p>";
+            return;
+        }
+
+
+        reports.forEach(report => {
+
+            const card = document.createElement("div");
+
+            card.style.border = "1px solid #ccc";
+            card.style.borderRadius = "8px";
+            card.style.padding = "15px";
+            card.style.backgroundColor = "#ffffff";
+            card.style.boxShadow = "0 2px 5px rgba(0,0,0,0.08)";
+
+
+            // ===== Image =====
+
+            let imageHTML = "";
+
+            if (report.image_path) {
+
+                imageHTML = `
+                    <img
+                        src="${report.image_path}"
+                        style="
+                            width: 100%;
+                            height: 200px;
+                            object-fit: cover;
+                            border-radius: 6px;
+                            margin-bottom: 10px;
+                        "
+                    >
+                `;
+            }
+
+
+            // ===== Time =====
+
+            let timeHTML = "";
+
+            if (report.estimated_start || report.estimated_end) {
+
+                timeHTML = `
+                    <p>
+                        <strong>Time:</strong>
+                        ${report.estimated_start ?? "?"}
+                        -
+                        ${report.estimated_end ?? "?"}
+                    </p>
+                `;
+            }
+
+
+            // ===== Card =====
+
+            card.innerHTML = `
+
+                ${imageHTML}
+
+                <h3>
+                    ${escapeHtml(report.category || "Unknown Item")}
+                </h3>
+
+                <p>
+                    <strong>Status:</strong>
+                    ${escapeHtml(report.status)}
+                </p>
+
+                <p>
+                    <strong>Location:</strong>
+                    ${escapeHtml(report.location)}
+                </p>
+
+                <p>
+                    <strong>Date:</strong>
+                    ${report.estimated_date ?? "Unknown"}
+                </p>
+
+                ${timeHTML}
+
+                <p>
+                    <strong>Color:</strong>
+                    ${escapeHtml(report.color || "-")}
+                </p>
+
+                <p>
+                    <strong>Material:</strong>
+                    ${escapeHtml(report.material || "-")}
+                </p>
+
+                <p>
+                    <strong>Description:</strong><br>
+                    ${escapeHtml(report.description_raw || "-")}
+                </p>
+
+            `;
+
+            container.appendChild(card);
+
+        });
+
+    }
+    catch (error) {
+
+        console.error(error);
+
+        container.innerHTML =
+            "<p>Failed to load reports.</p>";
+    }
+}
+        async function sendRawDescription() {
+            // Metadata (Keywords)
+            const statusValue = document.querySelector('input[name="item_status"]:checked').value;
+            const locationValue = document.getElementById("location_select").value;
+            const dateValue = document.getElementById("estimated_date").value;
+            const startValue = document.getElementById("estimated_start").value;
+            const endValue = document.getElementById("estimated_end").value;
+            const categoryValue = document.getElementById("category_input").value;
+            const colorValue = document.getElementById("color_input").value;
+            const materialValue = document.getElementById("material_input").value;
+
+
+            // Text Description
+            const textareaValue = document.getElementById("description_raw").value;
+
+            // Image
+            const imageFileInput = document.getElementById("image_file");
+
+
+            // (Text + Image file)
+            const formData = new FormData();
+            formData.append("status", statusValue);
+            formData.append("location", locationValue);
+            formData.append("date", dateValue);
+            formData.append("estimated_start", startValue);
+            formData.append("estimated_end", endValue);
+            formData.append("category", categoryValue);
+            formData.append("color", colorValue);
+            formData.append("material", materialValue);
+
+            formData.append("text", textareaValue);
+
+            // If an image is attached, append the input
+            if (imageFileInput.files[0]) {
+                formData.append("image", imageFileInput.files[0]);
+            }
+
+            try {
+                // Send POST to a FastAPI Server
+                const response = await fetch("/api/process", {
+                    method: "POST",
+                    body: formData
+                });
+
+                // Parse a HTTP response to a JSON
+                const result = await response.json();
+                console.log("Result:", result);
+
+
+
+                if (result.status === "success") {
+                    document.getElementById("json_result").innerText = JSON.stringify(result.parsed_data, null, 2);
+
+                    loadReports();
+                }
+                
+            } catch (error) {
+                console.error("SERVER ERROR:", error);
+            }
+        }
+
+loadReports();
+    </script>
+
+
+</body>
+</html>

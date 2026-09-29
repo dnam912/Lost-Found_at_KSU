@@ -19,4 +19,4 @@ cloudflared.exe
 *.sh
 !install_venv.sh
 
-dump.sql
+db/dump.sql

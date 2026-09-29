@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Gallery</title>
+    
+    <style>
+        .gallery-card {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            background-color: #ffffff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+        }
+        .gallery-card img {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .file-info {
+            font-size: 12px;
+            color: #555;
+            margin: 8px 0;
+            word-break: break-all;
+        }
+        .delete-btn {
+            background-color: #ff4d4f;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .delete-btn:hover {
+            background-color: #d9363e;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Uploaded Images Admin Gallery</h2>
+
+    <!-- ===== ===== Admin Image Gallery ===== ===== -->
+    <div id="admin_gallery_container"
+        style="
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        ">
+    </div>
+
+    
+    <!-- ===== ===== Javascript ===== ===== -->
+    <script>
+        function escapeHtml(value) {
+
+            return String(value)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        // ===== 1. Load Admin Gallery =====
+        async function loadAdminGallery() {
+            const container = document.getElementById("admin_gallery_container");
+            container.innerHTML = "Loading gallery...";
+
+            try {
+                const response = await fetch("/api/admin/gallery-data");
+                if (!response.ok) throw new Error("Failed to load gallery data");
+
+                const data = await response.json();
+                container.innerHTML = "";
+
+                if (data.images.length === 0) {
+                    container.innerHTML = "<p>No uploaded images found.</p>";
+                    return;
+                }
+
+                data.images.forEach(img => {
+                    const card = document.createElement("div");
+                    card.className = "gallery-card";
+
+                    card.innerHTML = `
+                        <img src="${img.url}" alt="${escapeHtml(img.saved_name)}">
+                        <div class="file-info">
+                            <strong>Original Name:</strong><br>${escapeHtml(img.original_name)}<br><br>
+                            <strong>Saved Name:</strong><br>${escapeHtml(img.saved_name)}
+                        </div>
+                        <button class="delete-btn" onclick="deleteImage('${escapeHtml(img.saved_name)}')">Delete</button>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                console.error(error);
+                container.innerHTML = "<p>Failed to load gallery images.</p>";
+            }
+        }
+
+        // ===== 2. Delete Image Function =====
+        async function deleteImage(filename) {
+            if (!confirm(`Are you sure you want to delete ${filename}?`)) return;
+
+            try {
+                const response = await fetch('/admin/gallery/' + encodeURIComponent(filename), {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert("File deleted successfully.");
+                    loadAdminGallery(); // Reload gallery view without refreshing the page
+                } else {
+                    alert("Delete failed: " + (result.detail || "Unknown error"));
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Network communication error.");
+            }
+        }
+
+        
+        // Initialize Page Data
+        loadAdminGallery();
+    </script>
+
+
+</body>

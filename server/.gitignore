@@ -18,3 +18,5 @@ cloudflared.exe
 !install_venv.bat
 *.sh
 !install_venv.sh
+
+dump.sql

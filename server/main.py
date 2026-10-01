@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from db.database import get_db
+from api.mobile_matching import router as mobile_matching_router
 
 
 # ================= DO NOT MODIFY =================
@@ -68,6 +69,7 @@ app.mount(
 
 # External API routes.
 app.include_router(process_router)
+app.include_router(mobile_matching_router)
 
 # The public homepage URL
 @app.get("/")
@@ -163,7 +165,7 @@ def delete_image(
 
     if not file_path.is_file() or file_path.parent != UPLOADED_IMAGES_DIR:
         raise HTTPException(
-            status_code=404, 
+            status_code=404,
             detail="File not found"
         )
 
@@ -193,13 +195,13 @@ def delete_image(
         # Delete the image file from directory
         os.remove(file_path)
         return {
-            "status": "success", 
+            "status": "success",
             "message": f"{filename} deleted successfully"
         }
 
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=f"Failed to delete file: {str(e)}"
         )

@@ -38,7 +38,7 @@ def parse_date(date_str: str) -> date | None:
     try:
         return datetime.strptime(date_str, "%m/%d/%Y").date()
     except ValueError as exc:
-        raise HTTPException(status_code=400, 
+        raise HTTPException(status_code=400,
                             detail="Date must be MM/DD/YYYY"
                             ) from exc
 
@@ -51,7 +51,7 @@ def parse_time(time_str: str) -> time | None:
         return time.fromisoformat(time_str)
     except ValueError as exc:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail="Time must be in ISO format"
         ) from exc
 
@@ -164,30 +164,3 @@ async def process_form(
         "status": "success",
         "parsed_data": dict(saved)
     }
-
-
-
-# =========================
-# Show all reports
-# =========================
-@router.get("/reports")
-def get_reports(db: Session = Depends(get_db)):
-    query = text("""
-        SELECT
-            id, 
-            status, 
-            location, 
-            estimated_date, 
-            estimated_start, estimated_end,
-            category, 
-            color, 
-            material, 
-            description_raw, 
-            image_path, 
-            created_at
-        FROM reports
-        ORDER BY created_at DESC
-    """)
-
-    rows = db.execute(query).mappings().all()
-    return [dict(row) for row in rows]

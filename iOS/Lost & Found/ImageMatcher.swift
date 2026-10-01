@@ -2,18 +2,20 @@
 //  ImageMatcher.swift
 //  Lost & Found
 //
-//  Vision-based on-device image similarity matching.
-//  Uses VNGenerateImageFeaturePrintRequest to embed images into a
-//  feature vector.
+//  Image similarity matching with Vision and an optional MobileCLIP2 image encoder.
 //
 
 import UIKit
 import Vision
-import CoreImage
+import ImageIO
+import CoreML
+
+private let mobileCLIPModelName = "mobileclip_s2_image"
 
 enum ImageMatcherError: Error, LocalizedError {
     case noImageData
     case visionFailed(Error)
+    case mobileCLIPFailed(Error)
 
     var errorDescription: String? {
         switch self {
@@ -21,379 +23,279 @@ enum ImageMatcherError: Error, LocalizedError {
             return "Couldn't read image data from that photo."
         case .visionFailed(let error):
             return "Vision analysis failed: \(error.localizedDescription)"
+        case .mobileCLIPFailed(let error):
+            return "MobileCLIP analysis failed: \(error.localizedDescription)"
         }
     }
 }
 
 enum ImageMatcher {
+    static let disclosureSimilarityThreshold: Float = 0.75
 
-    /// Fixed canvas size every image is redrawn into before feature
-    /// extraction. Using an identical size/orientation/color-space for
-    /// every image
-    private static let canvasSize = CGSize(width: 360, height: 360)
-
-    /// Number of cells per side in the color/pattern grid (e.g. 8 -> 8x8 = 64 cells).
-    private static let colorGridSize = 8
-
-    /// Everything we need to compare one photo against another
     struct AnalyzedSubject {
         let featurePrint: VNFeaturePrintObservation
-        let colorSignature: ColorSignature
+        let mobileCLIPEmbedding: [Float]?
     }
 
-   // color signiture pretty simple stuff using grid cells
-    struct ColorSignature {
-        /// Flattened [r, g, b] values (each 0...1), one triplet per grid cell.
-        let values: [Float]
-    }
+    struct MatchScore {
+        let visionDistance: Float
+        let mobileCLIPDistance: Float?
 
-    /// Runs full analysis (feature print + color signature) on an image once,
-    /// so it can be cheaply compared against multiple candidates.
-    static func analyze(_ image: UIImage) throws -> AnalyzedSubject {
-        let subject = salientCrop(of: image)
-        guard let normalized = subject.normalizedForVision(targetSize: canvasSize),
-              let cgImage = normalized.cgImage else {
-            throw ImageMatcherError.noImageData
+        var usesMobileCLIP: Bool {
+            mobileCLIPDistance != nil
         }
 
-        let featurePrint = try featurePrint(fromPrepared: cgImage)
-        let colorSignature = colorSignature(fromPrepared: cgImage)
-        return AnalyzedSubject(featurePrint: featurePrint, colorSignature: colorSignature)
+        /// The model distance used for ranking. Lower is better.
+        var distance: Float {
+            mobileCLIPDistance ?? visionDistance
+        }
+
+        var mobileCLIPSimilarity: Float? {
+            guard let mobileCLIPDistance else { return nil }
+            return 1 - mobileCLIPDistance
+        }
+
+        /// Only MobileCLIP's raw cosine similarity can authorize showing a post.
+        /// Vision fallback scores are not calibrated to this threshold.
+        var qualifiesForDisclosure: Bool {
+            guard let mobileCLIPSimilarity else { return false }
+            return mobileCLIPSimilarity >= ImageMatcher.disclosureSimilarityThreshold
+        }
+
+        /// A display value only; it is not a probability or calibrated confidence.
+        var percentage: Int {
+            if let mobileCLIPSimilarity {
+                return max(0, min(100, Int((mobileCLIPSimilarity * 100).rounded())))
+            }
+            return max(0, min(100, Int(((1 - visionDistance) * 100).rounded())))
+        }
     }
 
-    /// Generates a Vision feature print (embedding) for a given image.
+    private static let mobileCLIP = MobileCLIPImageEncoder()
+
+    static func mobileCLIPEmbedding(for image: UIImage) throws -> [Float] {
+        try mobileCLIP.embedding(for: image)
+    }
+
+    static func analyze(_ image: UIImage) throws -> AnalyzedSubject {
+        let featurePrint = try featurePrintOrThrow(for: image)
+        let embedding = try? mobileCLIP.embedding(for: image)
+        return AnalyzedSubject(featurePrint: featurePrint, mobileCLIPEmbedding: embedding)
+    }
+
     static func featurePrint(for image: UIImage) -> VNFeaturePrintObservation? {
-        (try? featurePrintOrThrow(for: image)) ?? nil
+        try? featurePrintOrThrow(for: image)
     }
 
     static func featurePrintOrThrow(for image: UIImage) throws -> VNFeaturePrintObservation {
-        // Crop to the main object first so background/table/hand/lighting
-        // differences between two photos of the *same* item matter far less
-        // — VNGenerateImageFeaturePrintRequest embeds the whole frame, so
-        // without this, a busier or emptier background can swing the score
-        // even when the object itself is identical.
-        let subject = salientCrop(of: image)
-
-        guard let normalized = subject.normalizedForVision(targetSize: canvasSize),
-              let cgImage = normalized.cgImage else {
+        guard let cgImage = image.cgImage else {
             throw ImageMatcherError.noImageData
         }
 
-        return try featurePrint(fromPrepared: cgImage)
-    }
-
-    private static func featurePrint(fromPrepared cgImage: CGImage) throws -> VNFeaturePrintObservation {
         let request = VNGenerateImageFeaturePrintRequest()
-        // Image is already baked upright by normalizedForVision, so orientation is always .up.
-        let handler = VNImageRequestHandler(cgImage: cgImage, orientation: .up, options: [:])
+        let handler = VNImageRequestHandler(
+            cgImage: cgImage,
+            orientation: CGImagePropertyOrientation(image.imageOrientation),
+            options: [:]
+        )
 
         do {
             try handler.perform([request])
         } catch {
-            print("ImageMatcher: Vision perform failed - \(error)")
             throw ImageMatcherError.visionFailed(error)
         }
 
-        guard let result = request.results?.first as? VNFeaturePrintObservation else {
+        guard let featurePrint = request.results?.first as? VNFeaturePrintObservation else {
             throw ImageMatcherError.noImageData
         }
-        return result
+        return featurePrint
     }
 
-    /// Builds a color/pattern grid signature from an already-cropped,
-    /// already-normalized (fixed-size, upright) subject image.
-    private static func colorSignature(fromPrepared cgImage: CGImage) -> ColorSignature {
-        let width = colorGridSize * 8   // sample at a modest fixed resolution, e.g. 64x64
-        let height = colorGridSize * 8
-        let bytesPerPixel = 4
-        let bytesPerRow = width * bytesPerPixel
-        var pixelData = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
-
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        guard let context = CGContext(
-            data: &pixelData,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: bytesPerRow,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
-        ) else {
-            return ColorSignature(values: [Float](repeating: 0, count: colorGridSize * colorGridSize * 3))
-        }
-
-        context.interpolationQuality = .medium
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-
-        let cellPixels = width / colorGridSize
-        var values = [Float](repeating: 0, count: colorGridSize * colorGridSize * 3)
-
-        var globalSumR: Double = 0, globalSumG: Double = 0, globalSumB: Double = 0
-
-        for cellY in 0..<colorGridSize {
-            for cellX in 0..<colorGridSize {
-                var sumR: Int = 0, sumG: Int = 0, sumB: Int = 0
-                var count = 0
-                for y in (cellY * cellPixels)..<((cellY + 1) * cellPixels) {
-                    for x in (cellX * cellPixels)..<((cellX + 1) * cellPixels) {
-                        let offset = y * bytesPerRow + x * bytesPerPixel
-                        sumR += Int(pixelData[offset])
-                        sumG += Int(pixelData[offset + 1])
-                        sumB += Int(pixelData[offset + 2])
-                        count += 1
-                    }
-                }
-                let index = (cellY * colorGridSize + cellX) * 3
-                let avgR = count > 0 ? Float(sumR) / Float(count) / 255.0 : 0
-                let avgG = count > 0 ? Float(sumG) / Float(count) / 255.0 : 0
-                let avgB = count > 0 ? Float(sumB) / Float(count) / 255.0 : 0
-                values[index]     = avgR
-                values[index + 1] = avgG
-                values[index + 2] = avgB
-                globalSumR += Double(avgR)
-                globalSumG += Double(avgG)
-                globalSumB += Double(avgB)
-            }
-        }
-
-      // this is really bad im going to remove it
-        let cellCount = colorGridSize * colorGridSize
-        let epsilon = 0.02
-        let meanR = max(globalSumR / Double(cellCount), epsilon)
-        let meanG = max(globalSumG / Double(cellCount), epsilon)
-        let meanB = max(globalSumB / Double(cellCount), epsilon)
-
-        for cell in 0..<cellCount {
-            let i = cell * 3
-            values[i]     = Float(min(3.0, Double(values[i]) / meanR))
-            values[i + 1] = Float(min(3.0, Double(values[i + 1]) / meanG))
-            values[i + 2] = Float(min(3.0, Double(values[i + 2]) / meanB))
-        }
-
-        return ColorSignature(values: values)
-    }
-// slop
-    static func colorDistance(_ a: ColorSignature, _ b: ColorSignature) -> Float {
-        guard a.values.count == b.values.count, !a.values.isEmpty else { return 1 }
-        let cellCount = a.values.count / 3
-        var totalDistance: Float = 0
-        for cell in 0..<cellCount {
-            let i = cell * 3
-            let dr = a.values[i] - b.values[i]
-            let dg = a.values[i + 1] - b.values[i + 1]
-            let db = a.values[i + 2] - b.values[i + 2]
-            totalDistance += sqrt(dr * dr + dg * dg + db * db)
-        }
-        return totalDistance / Float(cellCount)
-    }
-
-   // cropping to find main item which is more hacks to prevent using hte groumd
-    private static func salientCrop(of image: UIImage) -> UIImage {
-        // Bake orientation upright at full resolution first (no resizing yet)
-        // so detection sees the photo the same way a person would.
-        guard let upright = image.normalizedForVision(targetSize: image.size),
-              let cgImage = upright.cgImage else {
-            return image
-        }
-
-        if let instanceCrop = foregroundInstanceCrop(cgImage: cgImage) {
-            return instanceCrop
-        }
-
-        return boundingBoxSaliencyCrop(cgImage: cgImage) ?? upright
-    }
-
-    /// Uses `VNGenerateForegroundInstanceMaskRequest` to segment out
-    /// individual foreground objects, picks the *largest* one
-    private static func foregroundInstanceCrop(cgImage: CGImage) -> UIImage? {
-        let request = VNGenerateForegroundInstanceMaskRequest()
-        let handler = VNImageRequestHandler(cgImage: cgImage, orientation: .up, options: [:])
-
-        do {
-            try handler.perform([request])
-        } catch {
-            print("ImageMatcher: foreground instance mask failed - \(error)")
-            return nil
-        }
-
-        guard
-            let observation = request.results?.first,
-            !observation.allInstances.isEmpty
-        else {
-            return nil
-        }
-
-        var bestBuffer: CVPixelBuffer?
-        var bestArea: CGFloat = 0
-
-        for label in observation.allInstances {
-            guard let buffer = try? observation.generateMaskedImage(
-                ofInstances: IndexSet([label]),
-                from: handler,
-                croppedToInstancesExtent: true
-            ) else { continue }
-
-            let extent = CIImage(cvPixelBuffer: buffer).extent
-            let area = extent.width * extent.height
-            if area > bestArea {
-                bestArea = area
-                bestBuffer = buffer
-            }
-        }
-
-        guard let bestBuffer else { return nil }
-
-        let ciImage = CIImage(cvPixelBuffer: bestBuffer)
-        let context = CIContext()
-        guard let cropped = context.createCGImage(ciImage, from: ciImage.extent) else { return nil }
-        return UIImage(cgImage: cropped)
-    }
-
-    /// Looser fallback: crop to the bounding box of the most salient object
-    /// (background inside the box is kept, but at least off-object clutter
-    /// outside the box is removed).
-    private static func boundingBoxSaliencyCrop(cgImage: CGImage) -> UIImage? {
-        let request = VNGenerateObjectnessBasedSaliencyImageRequest()
-        let handler = VNImageRequestHandler(cgImage: cgImage, orientation: .up, options: [:])
-
-        do {
-            try handler.perform([request])
-        } catch {
-            print("ImageMatcher: saliency request failed - \(error)")
-            return nil
-        }
-
-        guard
-            let observation = request.results?.first,
-            let salientObject = observation.salientObjects?.first
-        else {
-            return nil
-        }
-
-        let imageWidth = CGFloat(cgImage.width)
-        let imageHeight = CGFloat(cgImage.height)
-
-        // Vision's normalized rects have origin at bottom-left; convert to
-        // top-left pixel coordinates for CGImage cropping.
-        var rect = CGRect(
-            x: salientObject.boundingBox.origin.x * imageWidth,
-            y: (1 - salientObject.boundingBox.origin.y - salientObject.boundingBox.height) * imageHeight,
-            width: salientObject.boundingBox.width * imageWidth,
-            height: salientObject.boundingBox.height * imageHeight
-        )
-
-        // Add ~15% padding on each side so we don't crop the object's edges off. (hack)
-        let paddingX = rect.width * 0.15
-        let paddingY = rect.height * 0.15
-        rect = rect.insetBy(dx: -paddingX, dy: -paddingY)
-
-        // Clamp to image bounds.
-        rect = rect.intersection(CGRect(x: 0, y: 0, width: imageWidth, height: imageHeight))
-
-        guard rect.width > 1, rect.height > 1, let cropped = cgImage.cropping(to: rect) else {
-            return nil
-        }
-
-        return UIImage(cgImage: cropped)
-    }
-
-    /// Raw distance between two feature prints. 0 = identical, larger = more different.
     static func distance(_ a: VNFeaturePrintObservation, _ b: VNFeaturePrintObservation) -> Float? {
         var distance: Float = 0
         do {
             try a.computeDistance(&distance, to: b)
-            #if DEBUG
-            print("ImageMatcher: raw distance = \(distance)")
-            #endif
             return distance
         } catch {
-            print("ImageMatcher: failed to compute distance - \(error)")
             return nil
         }
     }
 
-    // i Harly like how this works this is just hacking %s again very bad
-    static func matchPercentage(distance: Float, low: Float = 0.15, high: Float = 0.95) -> Int {
-        let clamped = max(low, min(distance, high))
-        let normalized = (clamped - low) / (high - low) // 0 = perfect match, 1 = no match
-        let score = (1 - normalized) * 100
-        return Int(score.rounded())
-    }
+    static func compare(_ a: AnalyzedSubject, _ b: AnalyzedSubject) -> MatchScore? {
+        guard let visionDistance = distance(a.featurePrint, b.featurePrint) else {
+            return nil
+        }
 
-    // genuinely too strong will hate comparing pink to light pink why is it like this maybe use AI / btter ML
-    static func colorMatchPercentage(distance: Float, low: Float = 0.12, high: Float = 0.7) -> Int {
-        let clamped = max(low, min(distance, high))
-        let normalized = (clamped - low) / (high - low)
-        let score = (1 - normalized) * 100
-        return Int(score.rounded())
-    }
+        let mobileCLIPDistance: Float?
+        if let first = a.mobileCLIPEmbedding, let second = b.mobileCLIPEmbedding {
+            mobileCLIPDistance = cosineDistance(first, second)
+        } else {
+            mobileCLIPDistance = nil
+        }
 
-// storing all this stuff
-    struct CombinedMatchScore {
-        let overallPercentage: Int
-        let visionPercentage: Int
-        let colorPercentage: Int
-        let visionDistance: Float
-        let colorDistance: Float
-    }
-
-    /// Compares two already-analyzed subjects and produces a combined score.
-    static func compare(_ a: AnalyzedSubject, _ b: AnalyzedSubject) -> CombinedMatchScore? {
-        guard let visionDist = distance(a.featurePrint, b.featurePrint) else { return nil }
-        let colorDist = colorDistance(a.colorSignature, b.colorSignature)
-
-        let visionPct = matchPercentage(distance: visionDist)
-        let colorPct = colorMatchPercentage(distance: colorDist)
-
-       // more shitty hacks. Not a fan. Probably wont be here for lomng
-        let weighted = (Double(colorPct) * 0.55) + (Double(visionPct) * 0.45)
-        let capped = min(weighted, Double(colorPct) + 25)
-        let overall = Int(max(0, min(100, capped)).rounded())
-        // this is actually terrible I just keep spamming hacks togehter
-        return CombinedMatchScore(
-            overallPercentage: overall,
-            visionPercentage: visionPct,
-            colorPercentage: colorPct,
-            visionDistance: visionDist,
-            colorDistance: colorDist
+        return MatchScore(
+            visionDistance: visionDistance,
+            mobileCLIPDistance: mobileCLIPDistance
         )
     }
 
-    ///  analyzes and compares two images directly.
-    static func compare(_ imageA: UIImage, _ imageB: UIImage) -> CombinedMatchScore? {
+    static func compare(_ imageA: UIImage, _ imageB: UIImage) -> MatchScore? {
         guard
             let subjectA = try? analyze(imageA),
             let subjectB = try? analyze(imageB)
-        else { return nil }
+        else {
+            return nil
+        }
         return compare(subjectA, subjectB)
+    }
+
+    private static func cosineDistance(_ first: [Float], _ second: [Float]) -> Float? {
+        guard first.count == second.count, !first.isEmpty else { return nil }
+
+        var dot: Float = 0
+        var firstMagnitude: Float = 0
+        var secondMagnitude: Float = 0
+        for index in first.indices {
+            dot += first[index] * second[index]
+            firstMagnitude += first[index] * first[index]
+            secondMagnitude += second[index] * second[index]
+        }
+
+        guard firstMagnitude > 0, secondMagnitude > 0 else { return nil }
+        let cosineSimilarity = dot / (sqrt(firstMagnitude) * sqrt(secondMagnitude))
+        return 1 - cosineSimilarity
     }
 }
 
-// MARK: - Helpers
+private final class MobileCLIPImageEncoder {
+    private let model: MLModel?
 
-extension UIImage {
-// make the bitmap
-    func normalizedForVision(targetSize: CGSize) -> UIImage? {
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 1
-        format.opaque = true
-        let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
-        return renderer.image { _ in
-            // a really mid tier hack in order to not use alot of background (I need to imporve this lol)
-            UIColor.white.setFill()
-            UIRectFill(CGRect(origin: .zero, size: targetSize))
+    init() {
+        guard let modelURL = Bundle.main.url(
+            forResource: mobileCLIPModelName,
+            withExtension: "mlmodelc"
+        ) else {
+            model = nil
+            return
+        }
 
-            // Aspect-fill: scale so the shorter side fills the canvas, then
-            // center-crop, so the subject fills the frame consistently.
-            let widthRatio = targetSize.width / size.width
-            let heightRatio = targetSize.height / size.height
-            let scale = max(widthRatio, heightRatio)
-            let scaledSize = CGSize(width: size.width * scale, height: size.height * scale)
+        model = try? MLModel(contentsOf: modelURL)
+    }
+
+    func embedding(for image: UIImage) throws -> [Float] {
+        guard let model else {
+            throw ImageMatcherError.mobileCLIPFailed(MobileCLIPUnavailable())
+        }
+        guard let imageInput = model.modelDescription.inputDescriptionsByName.first(where: {
+            $0.value.type == .image
+        }) else {
+            throw ImageMatcherError.mobileCLIPFailed(MobileCLIPModelError.missingImageInput)
+        }
+        guard let output = model.modelDescription.outputDescriptionsByName.first(where: {
+            $0.value.type == .multiArray
+        }) else {
+            throw ImageMatcherError.mobileCLIPFailed(MobileCLIPModelError.missingEmbeddingOutput)
+        }
+
+        let constraint = imageInput.value.imageConstraint
+        let width = constraint?.pixelsWide ?? 256
+        let height = constraint?.pixelsHigh ?? 256
+        let pixelBuffer = try makePixelBuffer(from: image, width: width, height: height)
+        let input = MLFeatureValue(pixelBuffer: pixelBuffer)
+        let provider = try MLDictionaryFeatureProvider(dictionary: [imageInput.key: input])
+        let result = try model.prediction(from: provider)
+
+        guard let array = result.featureValue(for: output.key)?.multiArrayValue else {
+            throw MobileCLIPModelError.missingEmbeddingOutput
+        }
+        return (0..<array.count).map { array[$0].floatValue }
+    }
+
+    private func makePixelBuffer(from image: UIImage, width: Int, height: Int) throws -> CVPixelBuffer {
+        var pixelBuffer: CVPixelBuffer?
+        let attributes: [String: Any] = [
+            kCVPixelBufferCGImageCompatibilityKey as String: true,
+            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true
+        ]
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            width,
+            height,
+            kCVPixelFormatType_32BGRA,
+            attributes as CFDictionary,
+            &pixelBuffer
+        )
+        guard status == kCVReturnSuccess, let pixelBuffer else {
+            throw MobileCLIPModelError.pixelBufferCreationFailed
+        }
+
+        CVPixelBufferLockBaseAddress(pixelBuffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
+
+        guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else {
+            throw MobileCLIPModelError.pixelBufferCreationFailed
+        }
+
+        let targetSize = CGSize(width: width, height: height)
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        let preparedImage = renderer.image { _ in
+            let scale = max(targetSize.width / image.size.width, targetSize.height / image.size.height)
+            let scaledSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
             let origin = CGPoint(
                 x: (targetSize.width - scaledSize.width) / 2,
                 y: (targetSize.height - scaledSize.height) / 2
             )
-            draw(in: CGRect(origin: origin, size: scaledSize))
+            image.draw(in: CGRect(origin: origin, size: scaledSize))
+        }
+
+        guard let cgImage = preparedImage.cgImage else {
+            throw ImageMatcherError.noImageData
+        }
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: baseAddress,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+                | CGBitmapInfo.byteOrder32Little.rawValue
+        ) else { throw MobileCLIPModelError.pixelBufferCreationFailed }
+
+        context.interpolationQuality = .high
+        context.translateBy(x: 0, y: CGFloat(height))
+        context.scaleBy(x: 1, y: -1)
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return pixelBuffer
+    }
+}
+
+private struct MobileCLIPUnavailable: LocalizedError {
+    var errorDescription: String? {
+        "Add \(mobileCLIPModelName).mlmodel to the Xcode target to enable MobileCLIP."
+    }
+}
+
+private enum MobileCLIPModelError: Error {
+    case missingImageInput
+    case missingEmbeddingOutput
+    case pixelBufferCreationFailed
+}
+
+private extension CGImagePropertyOrientation {
+    init(_ orientation: UIImage.Orientation) {
+        switch orientation {
+        case .up: self = .up
+        case .upMirrored: self = .upMirrored
+        case .down: self = .down
+        case .downMirrored: self = .downMirrored
+        case .left: self = .left
+        case .leftMirrored: self = .leftMirrored
+        case .right: self = .right
+        case .rightMirrored: self = .rightMirrored
+        @unknown default: self = .up
         }
     }
 }

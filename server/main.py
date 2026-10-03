@@ -12,9 +12,9 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from db.database import get_db
-from api.mobile_matching import router as mobile_matching_router
 
 from api.mobile_matching import router as mobile_matching_router
+
 
 # ================= DO NOT MODIFY =================
 # DO NOT MODIFY: Tailscale / Cloudflared funnel routing depends on this path
@@ -70,7 +70,6 @@ app.mount(
 
 # External API routes
 app.include_router(process_router)
-app.include_router(mobile_matching_router)
 
 # Mobile API routes for MobileClip
 app.include_router(mobile_matching_router)

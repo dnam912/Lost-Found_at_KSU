@@ -8,8 +8,7 @@ from sqlalchemy.orm import Session
 
 from db.database import get_db
 from api.image_caching import process_and_cache_image
-# from vector.embedding_utils import generate_mobileclip_embedding
-
+# from vector.web_embedding import extract_web_image_embedding
 
 
 # ================= DO NOT MODIFY =================

@@ -12,12 +12,13 @@
 │   ├── static/               # Web interface assets
 │   │   └── index.html, admin_gallery.html
 │   ├── api/                  # API endpoints and route handlers
-│   │   └── process.py, json_schema.py, image_caching.py
+│   │   └── process.py, json_schema.py, image_caching.py, mobile_matching.py
 │   ├── db/                   # Database connections and models
 │   │   └── database.py, schema.sql
 │   ├── nlp/                  # Text processing and NLP (spaCy)
 │   │   └── spacy_nlp.py
 │   └── vector/               # Vector storage and embedding
+|       └── web_embedding.py
 
 ```
 

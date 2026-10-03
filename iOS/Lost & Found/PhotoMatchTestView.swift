@@ -9,19 +9,15 @@
 //
 
 import SwiftUI
-import Vision
 
 struct MatchResult: Identifiable {
-    let id = UUID()
-    let item: LostItem
-    let score: ImageMatcher.CombinedMatchScore
+    let match: ServerMatch
 
-    var percentage: Int { score.overallPercentage }
+    var id: Int { match.id }
+    var percentage: Int { Int((match.similarity * 100).rounded()) }
 }
 
 struct PhotoMatchTestView: View {
-    let candidateItems: [LostItem]
-
     @Environment(\.dismiss) private var dismiss
 
     @State private var capturedImage: UIImage?
@@ -90,7 +86,7 @@ struct PhotoMatchTestView: View {
                     .padding()
                 }
             }
-            .navigationTitle("Match Test")
+            .navigationTitle("Find My Item")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -146,17 +142,18 @@ struct PhotoMatchTestView: View {
 
     private var resultsList: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Results")
+            Text("Matches (75% or higher)")
                 .font(.headline)
 
             ForEach(results) { result in
-                NavigationLink(destination: ItemDetailView(item: result.item)) {
+                NavigationLink(destination: ServerMatchDetailView(match: result.match)) {
                     HStack {
+                        matchThumbnail(for: result.match)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(result.item.title)
+                            Text(result.match.category ?? "Found item")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.primary)
-                            Text(result.item.location)
+                            Text(result.match.location)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -164,15 +161,7 @@ struct PhotoMatchTestView: View {
                         VStack(alignment: .trailing, spacing: 2) {
                             Text("\(result.percentage)%")
                                 .font(.title3.bold())
-                                .foregroundStyle(result.percentage >= 70 ? .green : (result.percentage >= 40 ? KSU.gold : .secondary))
-                            #if DEBUG
-                            Text("color: \(result.score.colorPercentage)% · shape: \(result.score.visionPercentage)%")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            Text("d: \(String(format: "%.2f", result.score.visionDistance)) / c: \(String(format: "%.2f", result.score.colorDistance))")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            #endif
+                                .foregroundStyle(.green)
                         }
                     }
                     .padding(12)
@@ -184,42 +173,53 @@ struct PhotoMatchTestView: View {
         }
     }
 
+    @ViewBuilder
+    private func matchThumbnail(for match: ServerMatch) -> some View {
+        if let imageURL = LocalAPIClient.shared.imageURL(for: match.imagePath) {
+            AsyncImage(url: imageURL) { image in
+                image.resizable().scaledToFill()
+            } placeholder: {
+                Image(systemName: "shippingbox")
+                    .foregroundStyle(KSU.black)
+                    .frame(width: 52, height: 52)
+                    .background(KSU.gold.opacity(0.25))
+            }
+            .frame(width: 52, height: 52)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+    }
+
     private func runMatch(against image: UIImage) {
         errorMessage = nil
         isProcessing = true
         results = []
 
         DispatchQueue.global(qos: .userInitiated).async {
-            let newSubject: ImageMatcher.AnalyzedSubject
+            let embedding: [Float]
             do {
-                newSubject = try ImageMatcher.analyze(image)
+                embedding = try ImageMatcher.mobileCLIPEmbedding(for: image)
             } catch {
                 DispatchQueue.main.async {
                     self.errorMessage = (error as? ImageMatcherError)?.errorDescription
-                        ?? "Couldn't analyze that photo: \(error.localizedDescription)"
+                        ?? "Couldn't create an image embedding: \(error.localizedDescription)"
                     self.isProcessing = false
                 }
                 return
             }
 
-            var computed: [MatchResult] = []
-            for item in candidateItems {
-                guard
-                    let referenceImage = item.referenceImage,
-                    let referenceSubject = try? ImageMatcher.analyze(referenceImage),
-                    let score = ImageMatcher.compare(newSubject, referenceSubject)
-                else { continue }
-
-                computed.append(MatchResult(item: item, score: score))
-            }
-
-            computed.sort { $0.percentage > $1.percentage }
-
-            DispatchQueue.main.async {
-                if computed.isEmpty {
-                    self.errorMessage = "No found items with reference photos to compare against yet."
-                } else {
-                    self.results = computed
+            Task { @MainActor in
+                do {
+                    let matches = try await LocalAPIClient.shared.searchFoundItems(embedding: embedding)
+                    let qualified = matches.filter {
+                        $0.similarity >= Double(ImageMatcher.disclosureSimilarityThreshold)
+                    }
+                    if qualified.isEmpty {
+                        self.errorMessage = "No items reached the 75% image-match requirement. Try a clearer photo or another angle."
+                    } else {
+                        self.results = qualified.map(MatchResult.init(match:))
+                    }
+                } catch {
+                    self.errorMessage = error.localizedDescription
                 }
                 self.isProcessing = false
             }
@@ -228,5 +228,39 @@ struct PhotoMatchTestView: View {
 }
 
 #Preview {
-    PhotoMatchTestView(candidateItems: [])
+    PhotoMatchTestView()
+}
+
+private struct ServerMatchDetailView: View {
+    let match: ServerMatch
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if let imageURL = LocalAPIClient.shared.imageURL(for: match.imagePath) {
+                    AsyncImage(url: imageURL) { image in
+                        image.resizable().scaledToFit()
+                    } placeholder: {
+                        ProgressView().frame(maxWidth: .infinity, minHeight: 220)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+
+                Text(match.category ?? "Found item")
+                    .font(.title2.bold())
+                Label(match.location, systemImage: "mappin.circle.fill")
+                    .foregroundStyle(.secondary)
+                Text("Image similarity: \(Int((match.similarity * 100).rounded()))%")
+                    .font(.headline)
+                    .foregroundStyle(.green)
+                if let description = match.descriptionRaw, !description.isEmpty {
+                    Text(description)
+                }
+            }
+            .padding()
+        }
+        .background(KSU.background)
+        .navigationTitle("Possible Match")
+        .navigationBarTitleDisplayMode(.inline)
+    }
 }

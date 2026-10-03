@@ -91,7 +91,6 @@
                     card.innerHTML = `
                         <img src="${img.url}" alt="${escapeHtml(img.saved_name)}">
                         <div class="file-info">
-                            <strong>Original Name:</strong><br>${escapeHtml(img.original_name)}<br><br>
                             <strong>Saved Name:</strong><br>${escapeHtml(img.saved_name)}
                         </div>
                         <button class="delete-btn" onclick="deleteImage('${escapeHtml(img.saved_name)}')">Delete</button>

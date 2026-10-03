@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from db.database import get_db
 
+from api.mobile_matching import router as mobile_matching_router
 
 # ================= DO NOT MODIFY =================
 # DO NOT MODIFY: Tailscale / Cloudflared funnel routing depends on this path
@@ -66,8 +67,14 @@ app.mount(
 # ================= DO NOT MODIFY =================
 # DO NOT MODIFY: Tailscale / Cloudflared funnel routing depends on this path
 
-# External API routes.
+# External API routes
 app.include_router(process_router)
+
+# Mobile API routes for MobileClip
+app.include_router(mobile_matching_router)
+
+# Web API routes for MobileClip
+# app.include_router(web_matching_router)
 
 # The public homepage URL
 @app.get("/")
@@ -97,8 +104,10 @@ def db_test(db: Session = Depends(get_db)):
 @app.get("/admin/gallery")
 async def admin_gallery_page():
 
-    # Serves the admin gallery HTML page
-    return FileResponse(STATIC_DIR / "admin_gallery.html")
+    # Serves the admin gallery HTML page w/o browser caching
+    response = FileResponse(STATIC_DIR / "admin_gallery.html")
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
 
 
 # 2. JSON Gallery Data API Route
@@ -107,21 +116,24 @@ def get_gallery_data(db: Session = Depends(get_db)):
 
     """
     Returns JSON data containing image file details
-    (saved name, original name)
+    (saved name)
     """
     filename_map = {}
 
     try:
         records = db.execute(
-            text("SELECT image_path, original_filename FROM reports WHERE image_path IS NOT NULL")
+            text("""
+            SELECT image_path
+            FROM reports
+            WHERE image_path IS NOT NULL""")
         ).fetchall()
-        
+
         for row in records:
             if row.image_path:
                 saved_name = os.path.basename(row.image_path)
-                filename_map[saved_name] = row.original_filename or "Unknown"
+                filename_map[saved_name] = saved_name
     except Exception as e:
-        print(f"[Warning] Failed to fetch original filenames: {e}")
+        print(f"[Error] Failed to process gallery image records: {e}")
 
 
     allowed_extensions = ('.png', '.jpg', '.jpeg', '.webp', '.heic', '.heif')
@@ -142,7 +154,6 @@ def get_gallery_data(db: Session = Depends(get_db)):
     for file in files:
         images_list.append({
             "saved_name": file,
-            "original_name": filename_map.get(file, "N/A"),
             "url": f"/uploaded_images/{file}"
         })
 
@@ -173,7 +184,11 @@ def delete_image(
         target_path_pattern = f"%{filename}"
 
         reports_with_image = db.execute(
-            text("SELECT id FROM reports WHERE image_path LIKE :path"),
+            text("""
+            SELECT id
+            FROM reports
+            WHERE image_path
+            LIKE :path"""),
             {"path": target_path_pattern}
         ).fetchall()
 
@@ -181,7 +196,11 @@ def delete_image(
         # (set image_path to NULL)
         if reports_with_image:
             db.execute(
-                text("UPDATE reports SET image_path = NULL WHERE image_path LIKE :path"),
+                text("""
+                UPDATE reports
+                SET image_path = NULL
+                WHERE image_path
+                LIKE :path"""),
                 {"path": target_path_pattern}
             )
             db.commit()

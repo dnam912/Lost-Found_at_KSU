@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 
 from db.database import get_db
 from api.image_caching import process_and_cache_image
+# from vector.embedding_utils import generate_mobileclip_embedding
+
 
 
 # ================= DO NOT MODIFY =================
@@ -81,15 +83,24 @@ async def process_form(
     end_time = parse_time(estimated_end)
 
 
-    # 2. Process Image Upload
+    # 2. Process Image Upload & Embedding Initialization
     image_path = None
     image_hash = None
     disk_path = None
+    embedding_json = None
 
 
-    # 3. Caching Check
+    # 3. Caching Check & Image Processing
     if image and image.filename:
         image_path, image_hash, disk_path = await process_and_cache_image(image, db)
+
+        # [Will add this later] Create MobileCLIP vector from Python backend
+        # try:
+        #     embedding_vector = extract_web_image_embedding(disk_path)
+        #     embedding_json = json.dumps(embedding_vector)
+        # except Exception as exc:
+        #     print(f"[WARNING] Failed to extract embedding: {exc}")
+        #     embedding_json = None
 
 
     # 4. Database Insertion
@@ -104,7 +115,8 @@ async def process_form(
             material, 
             description_raw, 
             image_path,
-            image_hash
+            image_hash,
+            mobileclip_embedding
         ) 
         VALUES (
             :status, 
@@ -116,7 +128,8 @@ async def process_form(
             :material, 
             :description_raw, 
             :image_path,
-            :image_hash
+            :image_hash,
+            CAST(:mobileclip_embedding AS jsonb)
         )
         RETURNING
             id, 
@@ -147,7 +160,8 @@ async def process_form(
                 "material": material or None,
                 "description_raw": text_description or None,
                 "image_path": image_path,
-                "image_hash": image_hash
+                "image_hash": image_hash,
+                "mobileclip_embedding": embedding_json
             }
         )
         saved = result.mappings().one()

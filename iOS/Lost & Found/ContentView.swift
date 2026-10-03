@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 // MARK: - Theme
 enum KSU {
@@ -20,6 +21,17 @@ enum KSU {
 }
 
 // MARK: - Models
+enum PostStatus: String, CaseIterable, Identifiable {
+    case lost
+    case found
+
+    var id: String { rawValue }
+
+    var title: String {
+        rawValue.capitalized
+    }
+}
+
 struct LostItem: Identifiable {
     let id = UUID()
     let title: String
@@ -31,6 +43,7 @@ struct LostItem: Identifiable {
     var imageAssetName: String? = nil
     let location: String
     let datePosted: String
+    var status: PostStatus = .lost
     var comments: [Comment] = []
 
     /// The actual reference photo, if this item has one, for use with
@@ -50,48 +63,7 @@ struct Comment: Identifiable {
 
 // MARK: - Main View
 struct ContentView: View {
-    @State private var lostItems: [LostItem] = [
-        LostItem(
-            title: "Silver Backpack",
-            description: "Lost near the library with textbooks inside",
-            imageName: "square.and.pencil",
-            location: "Library - Building A",
-            datePosted: "Today at 2:30 PM",
-            comments: [
-                Comment(author: "John", text: "I saw something like this near the cafe", timestamp: "1h ago"),
-                Comment(author: "Sarah", text: "Check lost and found at Student Center", timestamp: "30m ago")
-            ]
-        ),
-        LostItem(
-            title: "Blue Airpods Case",
-            description: "Lost Airpods Pro case in blue color",
-            imageName: "airpodsmax",
-            location: "Student Center",
-            datePosted: "Yesterday at 5:00 PM",
-            comments: [
-                Comment(author: "Mike", text: "Found something similar, DM me!", timestamp: "2h ago")
-            ]
-        ),
-        LostItem(
-            title: "Blue Jacket",
-            description: "Navy blue winter jacket with Columbia logo",
-            imageName: "square.and.pencil",
-            location: "Gym - Locker Room",
-            datePosted: "2 days ago",
-            comments: []
-        ),
-        LostItem(
-            title: "White AirPods Case (Found)",
-            description: "Found on a desk, plain white AirPods case",
-            imageName: "airpodsmax",
-            imageAssetName: "foundAirpodsCase",
-            location: "Turned in at Student Center Front Desk",
-            datePosted: "Today at 11:15 AM",
-            comments: []
-        )
-    ]
-
-    @State private var showMatchTest = false
+    @State private var showCreatePost = false
     
     var body: some View {
         NavigationStack {
@@ -99,32 +71,90 @@ struct ContentView: View {
                 KSU.background.ignoresSafeArea()
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        // Header banner
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("KSU LOST & FOUND")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .tracking(2)
-                                .foregroundStyle(KSU.gold)
-                            Text("Reunite items with owners")
-                                .font(.title2.bold())
-                                .foregroundStyle(.primary)
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
+                    VStack(alignment: .leading, spacing: 24) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "lock.shield.fill")
+                                .font(.title2)
+                                .foregroundStyle(KSU.black)
+                                .frame(width: 48, height: 48)
+                                .background(KSU.gold)
+                                .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
 
-                        LazyVStack(spacing: 14) {
-                            ForEach(lostItems) { item in
-                                NavigationLink(destination: ItemDetailView(item: item)) {
-                                    LostItemRow(item: item)
-                                }
-                                .buttonStyle(.plain)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("KSU LOST & FOUND")
+                                    .font(.caption.weight(.bold))
+                                    .tracking(1.5)
+                                    .foregroundStyle(KSU.gold)
+                                Text("Private item matching")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(.secondary)
                             }
+                            Spacer()
                         }
-                        .padding(.horizontal)
-                        .padding(.bottom, 24)
+                        .padding(.top, 12)
+
+                        VStack(alignment: .leading, spacing: 18) {
+                            Label("PRIVATE BY DESIGN", systemImage: "lock.fill")
+                                .font(.caption.weight(.bold))
+                                .tracking(1.2)
+                                .foregroundStyle(KSU.gold)
+
+                            Text("Find what’s yours.")
+                                .font(.system(size: 30, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            Text("Upload a photo. If your item has been found and matches, you’ll see it.")
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.8))
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            NavigationLink {
+                                PhotoMatchTestView()
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "photo.badge.magnifyingglass")
+                                    Text("Search with a photo")
+                                        .fontWeight(.semibold)
+                                    Spacer()
+                                    Image(systemName: "arrow.right")
+                                        .font(.subheadline.weight(.semibold))
+                                }
+                                .foregroundStyle(KSU.black)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 15)
+                                .background(KSU.gold)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(22)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background {
+                            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [KSU.black, Color(red: 0.18, green: 0.18, blue: 0.20)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
+                        .overlay(alignment: .topTrailing) {
+                            Image(systemName: "viewfinder")
+                                .font(.system(size: 88, weight: .ultraLight))
+                                .foregroundStyle(.white.opacity(0.05))
+                                .padding(18)
+                                .accessibilityHidden(true)
+                        }
+
+                        Text("Have you found something? Use + to add a found-item post.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.bottom, 12)
                     }
+                    .padding(.horizontal)
                 }
             }
             .navigationTitle("")
@@ -139,19 +169,21 @@ struct ContentView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { showMatchTest = true }) {
+                    Button(action: { showCreatePost = true }) {
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
                             .foregroundStyle(KSU.gold)
                     }
+                    .accessibilityLabel("Create a found-item post")
                 }
             }
         }
         .tint(KSU.gold)
-        .sheet(isPresented: $showMatchTest) {
-            PhotoMatchTestView(candidateItems: lostItems)
+        .sheet(isPresented: $showCreatePost) {
+            CreatePostView()
         }
     }
+
 }
 
 // MARK: - List Row

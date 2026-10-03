@@ -20,3 +20,7 @@ cloudflared.exe
 !install_venv.sh
 
 db/dump.sql
+
+
+# Other Files
+requirements.backup.txt

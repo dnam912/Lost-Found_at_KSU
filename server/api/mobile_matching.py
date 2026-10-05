@@ -65,7 +65,7 @@ async def create_found_report(
                     description_raw, image_path, image_hash, mobileclip_embedding
                 )
                 VALUES (
-                    'found', :location, :estimated_date, :category,
+                    'Found', :location, :estimated_date, :category,
                     :description, :image_path, :image_hash,
                     CAST(:embedding AS jsonb)
                 )
@@ -102,7 +102,7 @@ def match_found_reports(
             SELECT id, status, location, category, description_raw,
                    image_path, created_at, mobileclip_embedding
             FROM reports
-            WHERE status = 'found'
+            WHERE lower(status) = 'found'
               AND image_path IS NOT NULL
               AND mobileclip_embedding IS NOT NULL
             ORDER BY created_at DESC

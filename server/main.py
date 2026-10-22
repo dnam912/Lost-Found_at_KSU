@@ -13,7 +13,11 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from db.database import get_db
 
+# External API Routes
 from api.mobile_matching import router as mobile_matching_router
+from security.bot_blocker import bot_blocker_middleware
+from security.log_viewer import router as log_viewer_router
+
 
 
 # ================= DO NOT MODIFY =================
@@ -28,7 +32,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # ==================================================
-
 
 
 # =========================
@@ -71,11 +74,19 @@ app.mount(
 # External API routes
 app.include_router(process_router)
 
+
 # Mobile API routes for MobileClip
 app.include_router(mobile_matching_router)
 
 # Web API routes for MobileClip
 # app.include_router(web_matching_router)
+
+# API routes for bot_blocker
+app.middleware("http")(bot_blocker_middleware)
+
+# API routes for log viewer from server
+app.include_router(log_viewer_router)
+
 
 # The public homepage URL
 @app.get("/")

@@ -1,328 +1,108 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lost & Found</title>
 
-    <style>
-        /* ===== Required Field Styling (Pinkish Orange) ===== */
-        .required-label {
-            color: #ff6b6b;
-            font-weight: bold;
-        }
-        .required-asterisk {
-            color: #ff5252;
-            margin-left: 2px;
-        }
-
-        /* ===== Optional Field Styling ===== */
-        .optional-label {
-            color: #666666;
-            font-size: 0.9em;
-            font-weight: normal;
-        }
-    </style>
+    <!-- CSS -->
+    <link rel="stylesheet" href="/static/style.css">
 </head>
-
 <body>
-    <h1>Lost & Found</h1>
-    <p>Enter a description here</p>
-
-
-    <!-- ===== ===== Keywords ===== ===== -->
-    <div style="display: flex; flex-direction: column; gap: 12px; max-width: 400px; margin-bottom: 15px;">
-
-        <!-- Image Upload (Recommended) -->
-        <div>
-            <label for="image_file"><strong>Image Upload:</strong></label><br>
-            <input type="file" id="image_file" accept="image/*, .heic, .HEIC" />
-            <!--<input type="file" id="image_file" accept="image/png, image/jpeg, image/jpg" />-->
-        </div>
-
-        <!-- Status Selection (Required) -->
-        <div>
-            <strong>Status:</strong><br>
-            <label><input type="radio" name="item_status" value="Lost" checked> Lost</label>
-            <label><input type="radio" name="item_status" value="Found"> Found</label>
-        </div>
-
-        <!-- Location Dropdown (Required) -->
-        <div>
-            <label for="location_select"><strong>Location:</strong></label><br>
-            <select id="location_select">
-                <option value="Student Center">Student Center</option>
-                <option value="Math and Science Building">Math and Science Building</option>
-                <option value="Library">Library</option>
-            </select>
-        </div>
-
-        <!-- Date (Required) -->
-        <div>
-            <strong>Date:</strong><br>
-            <label for="estimated_date">Date (mm/dd/yyyy):</label><br>
-            <input type="text" id="estimated_date" placeholder="MM/DD/YYYY" required /><br><br>
-        </div>
-
-        <!-- Estimated Time (Start & End) (Optional) -->
-        <div>
-            <strong>Estimated Time Range:</strong><br>
-            <label for="estimated_start">Start:</label>
-            <input type="time" id="estimated_start" /><br>
-            <label for="estimated_end">End:</label>
-            <input type="time" id="estimated_end" />
-        </div>
-
-        <!-- Category (Required - Critical Metadata) -->
-         <div>
-            <label for="category_input"><strong>Category:</strong></label><br>
-            <input type="text" id="category_input" placeholder="e.g. Wallet, Electronics, Keys" required />
-        </div>
-
-        <!-- Color -->
-        <div>
-            <label for="color_input"><strong>Color:</strong></label><br>
-            <input type="text" id="color_input" placeholder="e.g. Black, Navy, Silver" />
-        </div>
-
-        <!-- Material (Optional) -->
-        <div>
-            <label for="material_input"><strong>Material:</strong></label><br>
-            <input type="text" id="material_input" placeholder="e.g. Leather, Plastic, Metal" />
-        </div>
-
-    </div>
-
-    <!-- ===== ===== Description ===== ===== -->
-
-    <!-- Using Vanilla JavaScript with Textarea HTML
-        Reference: https://mimo.org/glossary/html/textarea
-    -->
-    <label for="description_raw"><strong>Description:</strong></label><br>
-    <textarea id="description_raw" name="item" rows="15" cols="40"></textarea>
-
-    <button onclick="sendRawDescription()">Submit</button>
-
-
-
-    <!-- ===== ===== Show a Form Result ===== ===== -->
-    <h2>Parsing Output</h2>
-    <div id="output" style="background-color: #f4f4f4; padding: 10px; border-radius: 5px;">
-        <pre id="json_result">Waiting for input..</pre>
-    </div>
-
-    <!-- ===== ===== Saved Reports ===== ===== -->
-    <h2>Lost & Found Reports</h2>
-
-    <div id="reports_container"
-        style="
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 16px;
-            margin-top: 16px;
-        ">
-    </div>
-
-    <!-- ===== ===== Javascript ===== ===== -->
-    <script>
-        function escapeHtml(value) {
-
-            return String(value)
-                .replaceAll("&", "&amp;")
-                .replaceAll("<", "&lt;")
-                .replaceAll(">", "&gt;")
-                .replaceAll('"', "&quot;")
-                .replaceAll("'", "&#039;");
-        }
-
-        // ===== 1. Load Reports =====
-        async function loadReports() {
-
-            const container = document.getElementById("reports_container");
-            container.innerHTML = "Loading...";
-
-            try {
-
-                const response = await fetch("/api/reports");
-
-                if (!response.ok) {
-                    throw new Error("Failed to load reports");
-                }
-
-                const reports = await response.json();
-                container.innerHTML = "";
-
-                if (reports.length === 0) {
-                    container.innerHTML = "<p>No reports yet.</p>";
-                    return;
-                }
-
-                reports.forEach(report => {
-
-                    const card = document.createElement("div");
-                    card.style.border = "1px solid #ccc";
-                    card.style.borderRadius = "8px";
-                    card.style.padding = "15px";
-                    card.style.backgroundColor = "#ffffff";
-                    card.style.boxShadow = "0 2px 5px rgba(0,0,0,0.08)";
-
-
-                    // ===== Image =====
-                    let imageHTML = "";
-
-                    if (report.image_path) {
-                        imageHTML = `
-                            <img
-                                src="${report.image_path}"
-                                style="
-                                    width: 100%;
-                                    height: 200px;
-                                    object-fit: cover;
-                                    border-radius: 6px;
-                                    margin-bottom: 10px;
-                                "
-                            >
-                        `;
-                    }
-
-                    // ===== Time =====
-                    let timeHTML = "";
-
-                    if (report.estimated_start || report.estimated_end) {
-                        timeHTML = `
-                            <p>
-                                <strong>Time:</strong>
-                                ${report.estimated_start ?? "?"}
-                                -
-                                ${report.estimated_end ?? "?"}
-                            </p>
-                        `;
-                    }
-
-                    // ===== Card =====
-                    card.innerHTML = `
-
-                        ${imageHTML}
-
-                        <h3>
-                            ${escapeHtml(report.category || "Unknown Item")}
-                        </h3>
-
-                        <p>
-                            <strong>Status:</strong>
-                            ${escapeHtml(report.status)}
-                        </p>
-
-                        <p>
-                            <strong>Location:</strong>
-                            ${escapeHtml(report.location)}
-                        </p>
-
-                        <p>
-                            <strong>Date:</strong>
-                            ${report.estimated_date ?? "Unknown"}
-                        </p>
-
-                        ${timeHTML}
-
-                        <p>
-                            <strong>Color:</strong>
-                            ${escapeHtml(report.color || "-")}
-                        </p>
-
-                        <p>
-                            <strong>Material:</strong>
-                            ${escapeHtml(report.material || "-")}
-                        </p>
-
-                        <p>
-                            <strong>Description:</strong><br>
-                            ${escapeHtml(report.description_raw || "-")}
-                        </p>
-
-                    `;
-
-                    container.appendChild(card);
-
-                });
-            } catch (error) {
-                console.error(error);
-                container.innerHTML = "<p>Failed to load reports.</p>";
-            }
-        }
-
-
-        // ===== 2. Send Raw Description =====
-        async function sendRawDescription() {
-            // Metadata (Keywords)
-            const statusValue = document.querySelector('input[name="item_status"]:checked').value;
-            const locationValue = document.getElementById("location_select").value;
-            const dateValue = document.getElementById("estimated_date").value;
-            const startValue = document.getElementById("estimated_start").value;
-            const endValue = document.getElementById("estimated_end").value;
-            const categoryValue = document.getElementById("category_input").value;
-            const colorValue = document.getElementById("color_input").value;
-            const materialValue = document.getElementById("material_input").value;
-
-
-            // Text Description
-            const textareaValue = document.getElementById("description_raw").value;
-
-            // Image
-            const imageFileInput = document.getElementById("image_file");
-
-
-            // (Text + Image file)
-            const formData = new FormData();
-            formData.append("status", statusValue);
-            formData.append("location", locationValue);
-            formData.append("date", dateValue);
-            formData.append("estimated_start", startValue);
-            formData.append("estimated_end", endValue);
-            formData.append("category", categoryValue);
-            formData.append("color", colorValue);
-            formData.append("material", materialValue);
-
-            // Raw Description
-            formData.append("text", textareaValue);
-
-            // If an image is attached, append the input
-            if (imageFileInput.files[0]) {
-                formData.append("image", imageFileInput.files[0]);
-            }
-
-            try {
-                // Send POST to a FastAPI Server
-                const response = await fetch("/api/process", {
-                    method: "POST",
-                    body: formData
-                });
-
-                // Parse a HTTP response to a JSON
-                const result = await response.json();
-                console.log("Result:", result);
-
-                
-                if (response.status === 409) {
-                    alert("This image has already been uploaded");
-                    document.getElementById("json_result").innerText = JSON.stringify(result, null, 2);
-                    return;
-                } else if (result.status === "success") {
-                    document.getElementById("json_result").innerText = JSON.stringify(result.parsed_data, null, 2);
-
-                    loadReports(); // Refresh report items
-                }
-                
-            } catch (error) {
-                console.error("SERVER ERROR:", error);
-            }
-        }
-
-
-        
-        // Initialize Page Data
-        loadReports();
-    </script>
-
-
+    <header class="site-header">
+        <h1>Lost & Found</h1>
+        <a class="account-button" href="/static/account/login.html">Account</a>
+    </header>
+
+    <main>
+        <section class="matching-section" id="matching_section" aria-labelledby="matching_title" hidden>
+            <h2 id="matching_title">Top Matching Items</h2>
+            <p class="matching-subtitle">Closest matches based on your description</p>
+            <div class="matching-grid" id="matching_items"></div>
+        </section>
+
+        <section class="entry-section" aria-labelledby="entry_title">
+            <h2 id="entry_title">Enter item details</h2>
+            <form class="item-form" id="report_form">
+                <div class="form-row">
+                    <span class="field-label">Status</span>
+                    <div class="status-toggle" role="group" aria-label="Item status">
+                        <label><input type="radio" name="item_status" value="Lost" checked>Lost</label>
+                        <label><input type="radio" name="item_status" value="Found">Found</label>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <label for="estimated_date">Date</label>
+                    <input type="text" id="estimated_date" placeholder="mm/dd/yyyy" required>
+                </div>
+
+                <div class="form-row">
+                    <span class="field-label">Estimated Time</span>
+                    <div class="time-fields">
+                        <input type="time" id="estimated_start" aria-label="Estimated start time">
+                        <input type="time" id="estimated_end" aria-label="Estimated end time">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <label for="location_select">Location</label>
+                    <select id="location_select" required>
+                        <option value="" selected disabled>Select...</option>
+                        <option value="Student Center">Student Center</option>
+                        <option value="Math and Science Building">Math and Science Building</option>
+                        <option value="Library">Library</option>
+                    </select>
+                </div>
+
+                <!-- Add this field to the form and API after the database supports area.
+                <div class="form-row">
+                    <label for="area_input">Area</label>
+                    <input type="text" id="area_input" placeholder="room OR nth floor">
+                </div>
+                -->
+
+                <div class="form-row">
+                    <label for="category_input">Category</label>
+                    <input type="text" id="category_input" placeholder="item" required>
+                </div>
+
+                <div class="form-row">
+                    <label for="color_input">Color</label>
+                    <input type="text" id="color_input" placeholder="Primary color">
+                </div>
+
+                <div class="form-row">
+                    <label for="material_input">Material</label>
+                    <input type="text" id="material_input" placeholder="Material">
+                </div>
+
+                <div class="form-row description-row">
+                    <label for="description_raw">Description</label>
+                    <textarea id="description_raw" name="item" rows="4" placeholder="Feel free to write it"></textarea>
+                </div>
+
+                <div class="form-row">
+                    <label for="image_file">Image Upload</label>
+                    <input class="upload-control" type="file" id="image_file" accept="image/*, .heic, .HEIC">
+                </div>
+
+                <button class="submit-button" type="submit" id="submit_button">Submit</button>
+            </form>
+        </section>
+
+        <section class="debug-section" aria-labelledby="parsing_title">
+            <h2 id="parsing_title">Parsing Output</h2>
+            <div id="output"><pre id="json_result">Waiting for input..</pre></div>
+        </section>
+
+        <section class="debug-section" aria-labelledby="reports_title">
+            <h2 id="reports_title">Lost &amp; Found Reports</h2>
+            <div id="reports_container"></div>
+        </section>
+    </main>
+
+    <!-- JavaScript -->
+    <script src="/static/script.js"></script>
 </body>
 </html>

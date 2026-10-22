@@ -11,7 +11,6 @@ from api.image_caching import process_and_cache_image
 # from vector.web_embedding import extract_web_image_embedding
 
 
-
 # ================= DO NOT MODIFY =================
 # DO NOT MODIFY: Tailscale / Cloudflared funnel routing depends on this path
 router = APIRouter(prefix="/api")

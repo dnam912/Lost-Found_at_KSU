@@ -24,3 +24,5 @@ db/dump.sql
 
 # Other Files
 requirements.backup.txt
+security/
+static/drafts

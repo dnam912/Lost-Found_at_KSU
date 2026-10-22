@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign Up | Lost & Found</title>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="/static/account/auth.css">
+</head>
+<body>
+    <header class="site-header">
+        <h1>Lost & Found</h1>
+        <a class="back-button" href="/static/index.html">Back</a>
+    </header>
+
+    <main class="auth-main">
+        <section class="auth-panel" aria-labelledby="auth-title">
+            <h1 id="auth-title">Create an account</h1>
+            <p class="subtitle">Sign up with your Kent State email</p>
+
+            <form id="signup-form" class="auth-form">
+                <label for="email">Kent State Email</label>
+                <input id="email" name="email" type="email" placeholder="name@kent.edu"
+                       autocomplete="email" maxlength="254" required>
+
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password" placeholder="Create a password"
+                       autocomplete="new-password" minlength="8" required>
+
+                <label for="confirm-password">Confirm Password</label>
+                <input id="confirm-password" name="confirm_password" type="password" placeholder="Re-enter your password"
+                       autocomplete="new-password" minlength="8" required>
+
+                <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
+                <button class="primary-button" type="submit">Sign Up</button>
+            </form>
+
+            <p class="switch-page">Already have an account? <a href="/static/account/login.html">Log in</a></p>
+        </section>
+    </main>
+
+    <!-- JavaScript -->
+    <script src="/static/account/auth.js"></script>
+</body>
+</html>

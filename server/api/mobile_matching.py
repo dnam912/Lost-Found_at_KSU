@@ -64,12 +64,13 @@ async def create_found_report(
             text("""
                 INSERT INTO reports (
                     status, location, estimated_date, category,
-                    description_raw, image_path, image_hash, mobileclip_embedding, owner_user_id
+                    description_raw, image_path, image_hash, mobileclip_embedding, 
+                    user_id
                 )
                 VALUES (
                     'Found', :location, :estimated_date, :category,
                     :description, :image_path, :image_hash,
-                    CAST(:embedding AS jsonb), :owner_user_id
+                    CAST(:embedding AS jsonb), :user_id
                 )
                 RETURNING id, status, location, category, description_raw,
                           image_path, created_at
@@ -82,7 +83,7 @@ async def create_found_report(
                 "image_path": image_path,
                 "image_hash": image_hash,
                 "embedding": json.dumps(parsed_embedding),
-                "owner_user_id": user.id,
+                "user_id": user.id,
             },
         ).mappings().one()
         db.commit()

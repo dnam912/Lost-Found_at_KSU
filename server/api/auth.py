@@ -71,9 +71,9 @@ def sign_up(credentials: Credentials, db: Session = Depends(get_db)) -> dict[str
     try:
         user_id = db.execute(
             text("""
-                INSERT INTO app_users (email, password_hash)
+                INSERT INTO users (email, password_hash)
                 VALUES (:email, :password_hash)
-                RETURNING id
+                RETURNING user_id
             """),
             {"email": email, "password_hash": password_hash},
         ).scalar_one()
@@ -87,7 +87,12 @@ def sign_up(credentials: Credentials, db: Session = Depends(get_db)) -> dict[str
 def log_in(credentials: Credentials, db: Session = Depends(get_db)) -> dict[str, Any]:
     email = credentials.email.strip().lower()
     row = db.execute(
-        text("SELECT id, email, password_hash FROM app_users WHERE email = :email"),
+        text(
+            """
+            SELECT user_id AS id, email, password_hash
+            FROM users
+            WHERE email = :email
+        """),
         {"email": email},
     ).mappings().first()
 
@@ -102,7 +107,12 @@ def log_in(credentials: Credentials, db: Session = Depends(get_db)) -> dict[str,
 
     if password_hasher.check_needs_rehash(row["password_hash"]):
         db.execute(
-            text("UPDATE app_users SET password_hash = :password_hash WHERE id = :user_id"),
+            text(
+                """
+                UPDATE users
+                SET password_hash = :password_hash
+                WHERE user_id = :user_id
+            """),
             {"password_hash": password_hasher.hash(credentials.password), "user_id": row["id"]},
         )
         db.commit()
@@ -115,22 +125,31 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> AuthenticatedUser:
     if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(status_code=401, detail="Authentication required.", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(
+            status_code=401, 
+            detail="Authentication required.", 
+            headers={"WWW-Authenticate": "Bearer"}
+        )
 
     token_hash = hashlib.sha256(credentials.credentials.encode("utf-8")).hexdigest()
     row = db.execute(
         text("""
-            SELECT u.id, u.email
+            SELECT u.user_id AS id, u.email
             FROM app_sessions s
-            JOIN app_users u ON u.id = s.user_id
+            JOIN users u ON u.user_id = s.user_id
             WHERE s.token_hash = :token_hash
               AND s.revoked_at IS NULL
               AND s.expires_at > now()
         """),
         {"token_hash": token_hash},
     ).mappings().first()
+
     if row is None:
-        raise HTTPException(status_code=401, detail="Session is invalid or expired.", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(
+            status_code=401, 
+            detail="Session is invalid or expired.", 
+            headers={"WWW-Authenticate": "Bearer"}
+        )
     return AuthenticatedUser(id=row["id"], email=row["email"])
 
 
@@ -146,7 +165,10 @@ def log_out(
     db: Session = Depends(get_db),
 ) -> None:
     if credentials is None:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+        raise HTTPException(
+            status_code=401, 
+            detail="Authentication required."
+        )
     token_hash = hashlib.sha256(credentials.credentials.encode("utf-8")).hexdigest()
     db.execute(
         text("UPDATE app_sessions SET revoked_at = now() WHERE token_hash = :token_hash AND revoked_at IS NULL"),

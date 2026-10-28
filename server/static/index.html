@@ -82,24 +82,27 @@
                     <textarea id="description_raw" name="item" rows="4" placeholder="Feel free to write it"></textarea>
                 </div>
 
-                <div class="form-row">
+                <div class="form-row" id="image_upload_row" hidden>
                     <label for="image_file">Image Upload</label>
                     <input class="upload-control" type="file" id="image_file" accept="image/*, .heic, .HEIC">
                 </div>
 
-                <button class="submit-button" type="submit" id="submit_button">Submit</button>
+                <button class="submit-button" type="submit" id="submit_button">Search Matches</button>
+                <div id="search_feedback" class="search-feedback" role="status" aria-live="polite" hidden></div>
             </form>
         </section>
 
-        <section class="debug-section" aria-labelledby="parsing_title">
-            <h2 id="parsing_title">Parsing Output</h2>
-            <div id="output"><pre id="json_result">Waiting for input..</pre></div>
-        </section>
-
-        <section class="debug-section" aria-labelledby="reports_title">
-            <h2 id="reports_title">Lost &amp; Found Reports</h2>
-            <div id="reports_container"></div>
-        </section>
+        <details class="debug-panel" id="developer_details">
+            <summary>Developer Output</summary>
+            <section class="debug-section" aria-labelledby="parsing_title">
+                <h2 id="parsing_title">Parsing Output</h2>
+                <div id="output"><pre id="json_result">Waiting for input..</pre></div>
+            </section>
+            <section class="debug-section" aria-labelledby="reports_title">
+                <h2 id="reports_title">Lost &amp; Found Reports</h2>
+                <div id="reports_container"></div>
+            </section>
+        </details>
     </main>
 
     <!-- JavaScript -->

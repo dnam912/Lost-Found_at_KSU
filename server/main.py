@@ -15,13 +15,14 @@ from db.database import get_db
 
 # External API Routes
 from api.mobile_matching import router as mobile_matching_router
-<<<<<<< Updated upstream
+from api.web_matching import router as web_matching_router
+
 from security.bot_blocker import bot_blocker_middleware
 from security.log_viewer import router as log_viewer_router
 
-=======
+# Login
 from api.auth import router as auth_router
->>>>>>> Stashed changes
+
 
 
 # ================= DO NOT MODIFY =================
@@ -72,24 +73,20 @@ app.mount(
 # Router Registration
 # =========================
 
-# ================= DO NOT MODIFY =================
-# DO NOT MODIFY: Tailscale / Cloudflared funnel routing depends on this path
-
 # External API routes
 app.include_router(process_router)
 
+# Login
+app.include_router(auth_router)
 
 # Mobile API routes for MobileClip
 app.include_router(mobile_matching_router)
-app.include_router(auth_router)
 
 # Web API routes for MobileClip
-# app.include_router(web_matching_router)
+app.include_router(web_matching_router)
 
-# API routes for bot_blocker
+# API routes for Security
 app.middleware("http")(bot_blocker_middleware)
-
-# API routes for log viewer from server
 app.include_router(log_viewer_router)
 
 
@@ -97,7 +94,6 @@ app.include_router(log_viewer_router)
 @app.get("/")
 async def root():
     return FileResponse(STATIC_DIR / "index.html")
-# ==================================================
 
 
 @app.get("/db-test")

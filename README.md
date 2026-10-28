@@ -7,18 +7,25 @@
 │   └── SwiftUI/
 ├── server/
 │   ├── main.py
+│   ├── requirements.txt
 │   ├── install_venv.sh
 │   ├── install_venv.bat
 │   ├── static/               # Web interface assets
-│   │   └── index.html, admin_gallery.html
+│   │   ├── index.html, script.js, style.css, admin_gallery.html
+│   │   └── account/
+│   │       └── login.html, signup.html, verification.html, ...
 │   ├── api/                  # API endpoints and route handlers
-│   │   └── process.py, json_schema.py, image_caching.py, mobile_matching.py
-│   ├── db/                   # Database connections and models
-│   │   └── database.py, schema.sql
+│   │   ├── auth.py, process.py, json_schema.py, image_caching.py
+│   │   └── web_matching.py, mobile_matching.py
+│   ├── db/                   # PostgreSQL connection and schema
+│   │   ├── database.py, lostfoundschemadb.sql
+│   │   └── migrations/
+│   │       ├── 001_add_mobileclip_embedding.sql
+│   │       └── 002_add_app_auth.sql
 │   ├── nlp/                  # Text processing and NLP (spaCy)
 │   │   └── spacy_nlp.py
-│   └── vector/               # Vector storage and embedding
-|       └── web_embedding.py
+│   ├── vector/               # Vector storage and embedding
+│       └── web_embedding.py
 
 ```
 

@@ -10,6 +10,10 @@ from db.database import get_db
 from api.image_caching import process_and_cache_image
 # from vector.web_embedding import extract_web_image_embedding
 
+# Login
+from api.auth import AuthenticatedUser, get_current_user
+
+
 
 # ================= DO NOT MODIFY =================
 # DO NOT MODIFY: Tailscale / Cloudflared funnel routing depends on this path
@@ -74,6 +78,7 @@ async def process_form(
     text_description: str = Form("", alias="text"),
     image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(get_current_user)
 ):
     
     # 1. Parse & Validate Inputs
@@ -115,7 +120,9 @@ async def process_form(
             description_raw, 
             image_path,
             image_hash,
-            mobileclip_embedding
+            mobileclip_embedding,
+
+            user_id
         ) 
         VALUES (
             :status, 
@@ -128,7 +135,9 @@ async def process_form(
             :description_raw, 
             :image_path,
             :image_hash,
-            CAST(:mobileclip_embedding AS jsonb)
+            CAST(:mobileclip_embedding AS jsonb),
+
+            :user_id
         )
         RETURNING
             id, 
@@ -160,7 +169,9 @@ async def process_form(
                 "description_raw": text_description or None,
                 "image_path": image_path,
                 "image_hash": image_hash,
-                "mobileclip_embedding": embedding_json
+                "mobileclip_embedding": embedding_json,
+
+                "user_id": user.id
             }
         )
         saved = result.mappings().one()
@@ -177,3 +188,33 @@ async def process_form(
         "status": "success",
         "parsed_data": dict(saved)
     }
+
+
+
+
+# =========================
+# Show all reports
+# =========================
+'''
+@router.get("/reports")
+def get_reports(db: Session = Depends(get_db)):
+    query = text("""
+        SELECT
+            id, 
+            status, 
+            location, 
+            estimated_date, 
+            estimated_start, estimated_end,
+            category, 
+            color, 
+            material, 
+            description_raw, 
+            image_path, 
+            created_at
+        FROM reports
+        ORDER BY created_at DESC
+    """)
+
+    rows = db.execute(query).mappings().all()
+    return [dict(row) for row in rows]
+'''

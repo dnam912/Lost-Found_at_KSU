@@ -58,7 +58,7 @@ struct CreatePostView: View {
                 }
 
                 Section {
-                    Text("This development build sends the photo and its on-device MobileCLIP embedding to the FastAPI server used by the website. It is unauthenticated; use test data only.")
+                    Text("Your photo and its on-device MobileCLIP embedding are sent to the KSU Lost & Found server.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

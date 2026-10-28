@@ -1,6 +1,11 @@
 import Foundation
 import UIKit
 
+private struct CredentialsRequest: Encodable {
+    let email: String
+    let password: String
+}
+
 struct ServerMatch: Decodable, Identifiable {
     let id: Int
     let status: String
@@ -52,6 +57,7 @@ final class LocalAPIClient {
         var request = URLRequest(url: baseURL.appending(path: "/api/match"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try addAuthorization(to: &request)
         request.httpBody = try JSONEncoder().encode(MatchRequest(embedding: embedding))
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -74,6 +80,7 @@ final class LocalAPIClient {
         var request = URLRequest(url: baseURL.appending(path: "/api/found"))
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        try addAuthorization(to: &request)
 
         var body = Data()
         appendField("title", value: title, boundary: boundary, to: &body)
@@ -90,6 +97,47 @@ final class LocalAPIClient {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         try validate(response: response, data: data)
+    }
+
+    func signUp(email: String, password: String) async throws -> AuthTokens {
+        try await authenticate(path: "/api/auth/signup", email: email, password: password)
+    }
+
+    func signIn(email: String, password: String) async throws -> AuthTokens {
+        try await authenticate(path: "/api/auth/login", email: email, password: password)
+    }
+
+    func currentUser(token: String) async throws -> AuthUser {
+        var request = URLRequest(url: baseURL.appending(path: "/api/auth/me"))
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data)
+        return try JSONDecoder().decode(AuthUser.self, from: data)
+    }
+
+    func signOut(token: String) async throws {
+        var request = URLRequest(url: baseURL.appending(path: "/api/auth/logout"))
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data)
+    }
+
+    private func authenticate(path: String, email: String, password: String) async throws -> AuthTokens {
+        var request = URLRequest(url: baseURL.appending(path: path))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(CredentialsRequest(email: email, password: password))
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data)
+        return try JSONDecoder().decode(AuthTokens.self, from: data)
+    }
+
+    private func addAuthorization(to request: inout URLRequest) throws {
+        guard let token = try SessionTokenStore.read() else {
+            throw LocalAPIError(message: "Please sign in to continue.")
+        }
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     }
 
     private func appendField(_ name: String, value: String, boundary: String, to body: inout Data) {

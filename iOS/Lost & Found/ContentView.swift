@@ -63,6 +63,7 @@ struct Comment: Identifiable {
 
 // MARK: - Main View
 struct ContentView: View {
+    @EnvironmentObject private var authSession: AuthSession
     @State private var showCreatePost = false
     
     var body: some View {
@@ -161,8 +162,10 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(action: {}) {
-                        Text("Login")
+                    Button {
+                        Task { await authSession.signOut() }
+                    } label: {
+                        Text("Sign out")
                             .font(.subheadline)
                             .fontWeight(.semibold)
                             .foregroundStyle(KSU.black)
@@ -396,4 +399,5 @@ struct CommentView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(AuthSession())
 }

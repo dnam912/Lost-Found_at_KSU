@@ -115,7 +115,8 @@ async def process_form(
             description_raw, 
             image_path,
             image_hash,
-            mobileclip_embedding
+            mobileclip_embedding,
+            owner_user_id
         ) 
         VALUES (
             :status, 
@@ -128,7 +129,8 @@ async def process_form(
             :description_raw, 
             :image_path,
             :image_hash,
-            CAST(:mobileclip_embedding AS jsonb)
+            CAST(:mobileclip_embedding AS jsonb),
+            :owner_user_id
         )
         RETURNING
             id, 
@@ -160,7 +162,8 @@ async def process_form(
                 "description_raw": text_description or None,
                 "image_path": image_path,
                 "image_hash": image_hash,
-                "mobileclip_embedding": embedding_json
+                "mobileclip_embedding": embedding_json,
+                "owner_user_id": user.id
             }
         )
         saved = result.mappings().one()

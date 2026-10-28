@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from api.image_caching import process_and_cache_image
+from api.auth import AuthenticatedUser, get_current_user
 from db.database import get_db
 
 router = APIRouter(prefix="/api")
@@ -49,6 +50,7 @@ async def create_found_report(
     description: str = Form("", max_length=5000),
     embedding: str = Form(...),
     image: UploadFile = File(...),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     try:
@@ -62,12 +64,12 @@ async def create_found_report(
             text("""
                 INSERT INTO reports (
                     status, location, estimated_date, category,
-                    description_raw, image_path, image_hash, mobileclip_embedding
+                    description_raw, image_path, image_hash, mobileclip_embedding, owner_user_id
                 )
                 VALUES (
                     'Found', :location, :estimated_date, :category,
                     :description, :image_path, :image_hash,
-                    CAST(:embedding AS jsonb)
+                    CAST(:embedding AS jsonb), :owner_user_id
                 )
                 RETURNING id, status, location, category, description_raw,
                           image_path, created_at
@@ -80,6 +82,7 @@ async def create_found_report(
                 "image_path": image_path,
                 "image_hash": image_hash,
                 "embedding": json.dumps(parsed_embedding),
+                "owner_user_id": user.id,
             },
         ).mappings().one()
         db.commit()
@@ -95,6 +98,7 @@ async def create_found_report(
 @router.post("/match")
 def match_found_reports(
     query: MatchQuery,
+    user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     rows = db.execute(

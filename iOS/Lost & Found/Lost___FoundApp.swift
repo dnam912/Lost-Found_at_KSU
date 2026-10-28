@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct Lost_FoundApp: App {
+    @StateObject private var authSession = AuthSession()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AuthGateView()
+                .environmentObject(authSession)
         }
     }
 }

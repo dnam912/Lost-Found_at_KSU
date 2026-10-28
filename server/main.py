@@ -15,9 +15,13 @@ from db.database import get_db
 
 # External API Routes
 from api.mobile_matching import router as mobile_matching_router
+<<<<<<< Updated upstream
 from security.bot_blocker import bot_blocker_middleware
 from security.log_viewer import router as log_viewer_router
 
+=======
+from api.auth import router as auth_router
+>>>>>>> Stashed changes
 
 
 # ================= DO NOT MODIFY =================
@@ -77,6 +81,7 @@ app.include_router(process_router)
 
 # Mobile API routes for MobileClip
 app.include_router(mobile_matching_router)
+app.include_router(auth_router)
 
 # Web API routes for MobileClip
 # app.include_router(web_matching_router)

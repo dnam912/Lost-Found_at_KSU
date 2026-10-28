@@ -14,7 +14,6 @@ from api.image_caching import process_and_cache_image
 from api.auth import AuthenticatedUser, get_current_user
 
 
-
 # ================= DO NOT MODIFY =================
 # DO NOT MODIFY: Tailscale / Cloudflared funnel routing depends on this path
 router = APIRouter(prefix="/api")

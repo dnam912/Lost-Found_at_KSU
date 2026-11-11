@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from db.database import get_db
 from api.image_caching import process_and_cache_image
+from api.auth import AuthenticatedUser, get_current_user
 # from vector.web_embedding import extract_web_image_embedding
 
 # Login
@@ -76,6 +77,7 @@ async def process_form(
     material: str = Form(""),
     text_description: str = Form("", alias="text"),
     image: UploadFile | None = File(None),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(get_current_user)
 ):

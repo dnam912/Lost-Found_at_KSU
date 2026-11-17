@@ -107,10 +107,12 @@ final class AuthSession: ObservableObject {
     }
 
     func signUp(email: String, password: String) async throws {
-        let tokens = try await LocalAPIClient.shared.signUp(email: email, password: password)
-        try SessionTokenStore.save(tokens.accessToken)
-        user = tokens.user
+        _ = try await LocalAPIClient.shared.signUp(email: email, password: password)
         startupError = nil
+    }
+
+    func resendVerification(email: String) async throws {
+        try await LocalAPIClient.shared.resendVerification(email: email)
     }
 
     func signOut() async {

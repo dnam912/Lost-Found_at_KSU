@@ -6,6 +6,14 @@ private struct CredentialsRequest: Encodable {
     let password: String
 }
 
+private struct EmailRequest: Encodable {
+    let email: String
+}
+
+struct SignUpResponse: Decodable {
+    let message: String
+}
+
 struct ServerMatch: Decodable, Identifiable {
     let id: Int
     let status: String
@@ -35,6 +43,7 @@ private struct MatchRequest: Encodable {
 
 struct LocalAPIError: LocalizedError {
     let message: String
+    var statusCode: Int? = nil
     var errorDescription: String? { message }
 }
 
@@ -99,8 +108,23 @@ final class LocalAPIClient {
         try validate(response: response, data: data)
     }
 
-    func signUp(email: String, password: String) async throws -> AuthTokens {
-        try await authenticate(path: "/api/auth/signup", email: email, password: password)
+    func signUp(email: String, password: String) async throws -> SignUpResponse {
+        var request = URLRequest(url: baseURL.appending(path: "/api/auth/signup"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(CredentialsRequest(email: email, password: password))
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data)
+        return try JSONDecoder().decode(SignUpResponse.self, from: data)
+    }
+
+    func resendVerification(email: String) async throws {
+        var request = URLRequest(url: baseURL.appending(path: "/api/auth/resend-verification"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(EmailRequest(email: email))
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data)
     }
 
     func signIn(email: String, password: String) async throws -> AuthTokens {
@@ -153,7 +177,10 @@ final class LocalAPIClient {
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
             let detail = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["detail"] as? String
-            throw LocalAPIError(message: detail ?? "Server request failed (HTTP \(httpResponse.statusCode)).")
+            throw LocalAPIError(
+                message: detail ?? "Server request failed (HTTP \(httpResponse.statusCode)).",
+                statusCode: httpResponse.statusCode
+            )
         }
     }
 }

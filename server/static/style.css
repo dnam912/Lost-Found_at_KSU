@@ -243,7 +243,13 @@ main {
 .time-fields { 
     display: grid; 
     grid-template-columns: 1fr 1fr; 
-    gap: 10px; }
+    gap: 10px;
+}
+.date-fields {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 8px;
+}
 
 .description-row { align-items: start; }
 .description-row > label { padding-top: 9px; }

@@ -33,8 +33,19 @@
                 </div>
 
                 <div class="form-row">
-                    <label for="estimated_date">Date</label>
-                    <input type="text" id="estimated_date" placeholder="mm/dd/yyyy" required>
+                    <!--<label for="estimated_date">Date</label>-->
+                    <span class="field-label">Date</span>
+                    <div class="date-fields">
+                        <select id="estimated_month" aria-label="Estimated month">
+                            <option value="">Month (Optional)</option>
+                        </select>
+                        <select id="estimated_day" aria-label="Estimated day">
+                            <option value="">Day (Optional)</option>
+                        </select>
+                        <select id="estimated_year" aria-label="Estimated year" required>
+                            <option value="" selected disabled>Year</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="form-row">
@@ -79,7 +90,7 @@
 
                 <div class="form-row description-row">
                     <label for="description_raw">Description</label>
-                    <textarea id="description_raw" name="item" rows="4" placeholder="Feel free to write it"></textarea>
+                    <textarea id="description_raw" name="item" rows="4" maxlength="3000" placeholder="Feel free to write it"></textarea>
                 </div>
 
                 <div class="form-row" id="image_upload_row" hidden>

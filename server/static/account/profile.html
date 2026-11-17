@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Profile | Lost & Found</title>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="/static/account/auth.css">
+</head>
+<body>
+    <header class="site-header">
+        <h1>Lost & Found</h1>
+        <a class="back-button" href="/static/index.html">Back</a>
+    </header>
+
+    <main class="auth-main">
+        <section class="auth-panel" aria-labelledby="auth-title">
+            <h1 id="auth-title">Account Profile</h1>
+            <p class="subtitle">Your active Kent State session</p>
+
+            <div class="auth-form">
+                <label>Kent State Email</label>
+                <div id="user-email" style="padding: 12px 14px; margin-bottom: 22px; background: var(--field); border: 1px solid var(--line); border-radius: 11px; font-size: 14px; color: var(--ink);">
+                    Loading...
+                </div>
+
+                <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
+                <button class="primary-button" id="logout-button" type="button" style="background: #bd3a31;">Log Out</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- JavaScript -->
+    <script>
+        async function loadProfile() {
+            const token = localStorage.getItem("access_token");
+            const emailDiv = document.getElementById("user-email");
+            const message = document.getElementById("form-message");
+
+            if (!token) {
+                window.location.href = "/static/account/login.html";
+                return;
+            }
+
+            try {
+                const response = await fetch("/api/auth/me", {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.detail || "Failed to load profile.");
+                }
+
+                emailDiv.textContent = result.email;
+            } catch (error) {
+                console.error(error);
+                localStorage.removeItem("access_token");
+                emailDiv.textContent = "Session expired.";
+                setTimeout(() => {
+                    window.location.href = "/static/account/login.html";
+                }, 1500);
+            }
+        }
+
+        document.getElementById("logout-button").addEventListener("click", async () => {
+            const token = localStorage.getItem("access_token");
+            try {
+                if (token) {
+                    await fetch("/api/auth/logout", {
+                        method: "POST",
+                        headers: { "Authorization": `Bearer ${token}` }
+                    });
+                }
+            } catch (err) {
+                console.error("Logout request failed:", err);
+            } finally {
+                localStorage.removeItem("access_token");
+                window.location.href = "/static/index.html";
+            }
+        });
+
+        loadProfile();
+    </script>
+</body>
+</html>

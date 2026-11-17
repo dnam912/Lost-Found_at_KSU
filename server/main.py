@@ -17,12 +17,20 @@ from db.database import get_db
 from api.mobile_matching import router as mobile_matching_router
 from api.web_matching import router as web_matching_router
 
-from security.bot_blocker import bot_blocker_middleware
-from security.log_viewer import router as log_viewer_router
+#from security.bot_blocker import bot_blocker_middleware
+#from security.log_viewer import router as log_viewer_router
 
 # Login
 from api.auth import router as auth_router
+try:
+    from security.bot_blocker import bot_blocker_middleware
+except ImportError:
+    bot_blocker_middleware = None
 
+try:
+    from security.log_viewer import router as log_viewer_router
+except ImportError:
+    log_viewer_router = None
 
 
 # ================= DO NOT MODIFY =================
@@ -86,8 +94,19 @@ app.include_router(mobile_matching_router)
 app.include_router(web_matching_router)
 
 # API routes for Security
-app.middleware("http")(bot_blocker_middleware)
-app.include_router(log_viewer_router)
+#app.middleware("http")(bot_blocker_middleware)
+#app.include_router(log_viewer_router)
+
+# API routes for bot_blocker, when the optional security module is installed.
+if bot_blocker_middleware is not None:
+    app.middleware("http")(bot_blocker_middleware)
+    print("[SECURITY] Bot blocker middleware enabled.")
+else:
+    print("[SECURITY] Bot blocker middleware NOT loaded.")
+
+# API routes for log viewer, when the optional security module is installed.
+if log_viewer_router is not None:
+    app.include_router(log_viewer_router)
 
 
 # The public homepage URL

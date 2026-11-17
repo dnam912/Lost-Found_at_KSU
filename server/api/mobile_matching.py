@@ -8,13 +8,21 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from api.image_caching import process_and_cache_image
 from api.auth import AuthenticatedUser, get_current_user
+from api.image_caching import process_and_cache_image
+
 from db.database import get_db
+from db.queries import get_reports_table_query
 
 router = APIRouter(prefix="/api")
+
+# ==================================================
+# Mobile Matching Configuration
+# ==================================================
 SIMILARITY_THRESHOLD = 0.75
 MAX_MATCHES = 5
+MAX_CANDIDATES = 1000
+# ==================================================
 
 
 class MatchQuery(BaseModel):
@@ -60,32 +68,73 @@ async def create_found_report(
 
     image_path, image_hash, disk_path = await process_and_cache_image(image, db)
     try:
-        result = db.execute(
+        # 1. Insert item record and retrieve its UUID primary key.
+        item_id = db.execute(
+            text("""
+                INSERT INTO items (category, description_raw)
+                VALUES (:category, :description)
+                RETURNING item_id
+            """),
+            {
+                "category": title.strip(),
+                "description": description.strip() or None,
+            },
+        ).scalar_one()
+
+        # 2. Insert report record referencing item_id and user_id.
+        report = db.execute(
             text("""
                 INSERT INTO reports (
-                    status, location, estimated_date, category,
-                    description_raw, image_path, image_hash, mobileclip_embedding, 
-                    user_id
+                    status,
+                    location,
+                    estimated_date,
+                    user_id,
+                    item_id
                 )
                 VALUES (
-                    'Found', :location, :estimated_date, :category,
-                    :description, :image_path, :image_hash,
-                    CAST(:embedding AS jsonb), :user_id
+                    'Found',
+                    :location,
+                    :estimated_date,
+                    :user_id,
+                    :item_id
                 )
-                RETURNING id, status, location, category, description_raw,
-                          image_path, created_at
+                RETURNING id, status, location, created_at
             """),
             {
                 "location": location.strip(),
-                "estimated_date": date.today(),
-                "category": title.strip(),
-                "description": description.strip() or None,
+                "estimated_date": date.today().isoformat(),
+                "user_id": user.id,
+                "item_id": item_id,
+            },
+        ).mappings().one()
+
+        # 3. Insert image record referencing both report_id (reports.id) and item_id.
+        db.execute(
+            text("""
+                INSERT INTO images (
+                    report_id,
+                    item_id,
+                    image_path,
+                    image_hash,
+                    mobileclip_embedding
+                )
+                VALUES (
+                    :report_id,
+                    :item_id,
+                    :image_path,
+                    :image_hash,
+                    CAST(:embedding AS jsonb)
+                )
+            """),
+            {
+                "report_id": report["id"],
+                "item_id": item_id,
                 "image_path": image_path,
                 "image_hash": image_hash,
                 "embedding": json.dumps(parsed_embedding),
-                "user_id": user.id,
             },
-        ).mappings().one()
+        )
+
         db.commit()
     except Exception:
         db.rollback()
@@ -93,7 +142,15 @@ async def create_found_report(
             disk_path.unlink()
         raise
 
-    return dict(result)
+    return {
+        "id": report["id"],
+        "status": report["status"],
+        "location": report["location"],
+        "category": title.strip(),
+        "description_raw": description.strip() or None,
+        "image_path": image_path,
+        "created_at": report["created_at"],
+    }
 
 
 @router.post("/match")
@@ -102,17 +159,22 @@ def match_found_reports(
     user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    
+    # Use centralized standard query with explicit table names and 'Found' status filter
+    match_query_sql = f"""
+        {get_reports_table_query()}
+        WHERE reports.status = 'Found'
+          AND images.image_path IS NOT NULL
+          AND images.mobileclip_embedding IS NOT NULL
+        ORDER BY reports.created_at DESC
+        LIMIT :limit
+    """
+    
     rows = db.execute(
-        text("""
-            SELECT id, status, location, category, description_raw,
-                   image_path, created_at, mobileclip_embedding
-            FROM reports
-            WHERE lower(status) = 'found'
-              AND image_path IS NOT NULL
-              AND mobileclip_embedding IS NOT NULL
-            ORDER BY created_at DESC
-        """)
+        text(match_query_sql),
+        {"limit": MAX_CANDIDATES},
     ).mappings().all()
+
 
     matches: list[dict[str, Any]] = []
     for row in rows:

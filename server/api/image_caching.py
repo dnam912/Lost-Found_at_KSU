@@ -21,7 +21,7 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
 # =========================
 def calculate_image_hash(contents: bytes) -> str:
     """
-    Calculate SHA-256 hash from file bytes
+    Calculate SHA-256 hash from file bytes.
     """
     return hashlib.sha256(contents).hexdigest()
 
@@ -29,10 +29,10 @@ def calculate_image_hash(contents: bytes) -> str:
 async def process_and_cache_image(
     image: UploadFile,
     db: Session
-) -> tuple[str, str]:
+) -> tuple[str, str, Path]:
     """
-    Validates, hashes, checks DB duplicates, and saves image to disk
-    Returns: (saved_image_path, file_hash)
+    Validates, hashes, checks DB duplicates in the images table, and saves image to disk.
+    Returns: (saved_image_path, file_hash, disk_path)
     """
     if not image.filename:
         raise HTTPException(
@@ -55,9 +55,14 @@ async def process_and_cache_image(
     file_hash = calculate_image_hash(contents)
 
 
-    # 3. Check duplicated image_hash in DB
+    # 3. Check duplicated image_hash in the images table (joined with reports for report_id)
     existing_record = db.execute(
-        text("SELECT id, image_path FROM reports WHERE image_hash = :hash"),
+        text("""
+            SELECT report_id, image_path 
+            FROM images 
+            WHERE image_hash = :hash
+            LIMIT 1
+        """),
         {"hash": file_hash}
     ).fetchone()
 
@@ -69,7 +74,7 @@ async def process_and_cache_image(
             detail={
                 "code": "DUPLICATE_IMAGE",
                 "message": "This image has already been uploaded",
-                "existing_report_id": existing_record.id,
+                "existing_report_id": existing_record.report_id,
                 "existing_image_path": existing_record.image_path
             }
         )

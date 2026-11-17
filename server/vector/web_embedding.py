@@ -5,10 +5,18 @@ from pathlib import Path
 
 
 MODEL_NAME = "mobileclip_s0"
-model, _, preprocess = mobileclip.create_model_and_transforms(MODEL_NAME, pretrained="checkpoints/mobileclip_s0.pt")
+CHECKPOINT_PATH = Path("checkpoints/mobileclip_s0.pt")
+
+
+# Initialize MobileCLIP model and preprocessing pipeline
+model, _, preprocess = mobileclip.create_model_and_transforms(
+    MODEL_NAME, 
+    pretrained=str(CHECKPOINT_PATH)
+)
 model.eval()
 
 
+# Embedding Extraction Function
 def extract_web_image_embedding(image_path: Path) -> list[float]:
     """
     Extracts MobileCLIP embedding vector on the server for web-uploaded images.

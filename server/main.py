@@ -13,14 +13,8 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from db.database import get_db
 
-# External API Routes
-from api.mobile_matching import router as mobile_matching_router
-from api.web_matching import router as web_matching_router
 
-#from security.bot_blocker import bot_blocker_middleware
-#from security.log_viewer import router as log_viewer_router
-
-# Login
+# Login & Security API Routes
 from api.auth import router as auth_router
 try:
     from security.bot_blocker import bot_blocker_middleware
@@ -31,6 +25,13 @@ try:
     from security.log_viewer import router as log_viewer_router
 except ImportError:
     log_viewer_router = None
+
+
+# External API Routes
+from api.mobile_matching import router as mobile_matching_router
+from api.web_matching import router as web_matching_router
+from api.reports_view import router as view_reports_router
+from api.admin_gallery import router as admin_gallery_router
 
 
 # ================= DO NOT MODIFY =================
@@ -93,27 +94,31 @@ app.include_router(mobile_matching_router)
 # Web API routes for MobileClip
 app.include_router(web_matching_router)
 
-# API routes for Security
-#app.middleware("http")(bot_blocker_middleware)
-#app.include_router(log_viewer_router)
+# Reports view routes
+app.include_router(view_reports_router)
 
-# API routes for bot_blocker, when the optional security module is installed.
+# Admin Gallery routes
+app.include_router(admin_gallery_router)
+
+
+# FOR SECURITY
+# API routes for bot_blokcer, when the optional security module is installed.
 if bot_blocker_middleware is not None:
     app.middleware("http")(bot_blocker_middleware)
     print("[SECURITY] Bot blocker middleware enabled.")
 else:
     print("[SECURITY] Bot blocker middleware NOT loaded.")
 
-# API routes for log viewer, when the optional security module is installed.
+# API routes for log_viewer, when the optional security module is installed.
 if log_viewer_router is not None:
     app.include_router(log_viewer_router)
+
 
 
 # The public homepage URL
 @app.get("/")
 async def root():
     return FileResponse(STATIC_DIR / "index.html")
-
 
 @app.get("/db-test")
 def db_test(db: Session = Depends(get_db)):
@@ -126,131 +131,3 @@ def db_test(db: Session = Depends(get_db)):
         "postgres": version
     }
 
-
-
-# =========================
-# Check Uploaded_images
-# =========================
-
-# 1. HTML Admin Gallery Page Route
-@app.get("/admin/gallery")
-async def admin_gallery_page():
-
-    # Serves the admin gallery HTML page w/o browser caching
-    response = FileResponse(STATIC_DIR / "admin_gallery.html")
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    return response
-
-
-# 2. JSON Gallery Data API Route
-@app.get("/api/admin/gallery-data")
-def get_gallery_data(db: Session = Depends(get_db)):
-
-    """
-    Returns JSON data containing image file details
-    (saved name)
-    """
-    filename_map = {}
-
-    try:
-        records = db.execute(
-            text("""
-            SELECT image_path
-            FROM reports
-            WHERE image_path IS NOT NULL""")
-        ).fetchall()
-
-        for row in records:
-            if row.image_path:
-                saved_name = os.path.basename(row.image_path)
-                filename_map[saved_name] = saved_name
-    except Exception as e:
-        print(f"[Error] Failed to process gallery image records: {e}")
-
-
-    allowed_extensions = ('.png', '.jpg', '.jpeg', '.webp', '.heic', '.heif')
-
-    files = []
-    for filename in os.listdir(UPLOADED_IMAGES_DIR):
-        # Convert filename to lowercase
-        lower_filename = filename.lower()
-        
-        if lower_filename.endswith(allowed_extensions):
-            files.append(filename)
-
-    
-    """
-    Return a structured list of image metadata
-    """
-    images_list = []
-    for file in files:
-        images_list.append({
-            "saved_name": file,
-            "url": f"/uploaded_images/{file}"
-        })
-
-    return {"images": images_list}
-
-
-# 3. Image Deletion API Route
-@app.delete("/admin/gallery/{filename}")
-def delete_image(
-    filename: str,
-    db: Session = Depends(get_db)
-    ):
-
-    """
-    Delete an image file from the uploaded_images directory
-    """
-    file_path = UPLOADED_IMAGES_DIR / filename
-
-    if not file_path.is_file() or file_path.parent != UPLOADED_IMAGES_DIR:
-        raise HTTPException(
-            status_code=404,
-            detail="File not found"
-        )
-
-    try:
-        # 1. Check if the image is referenced in the database
-        # (image path: /uploaded_images/filename)
-        target_path_pattern = f"%{filename}"
-
-        reports_with_image = db.execute(
-            text("""
-            SELECT id
-            FROM reports
-            WHERE image_path
-            LIKE :path"""),
-            {"path": target_path_pattern}
-        ).fetchall()
-
-        # 2. Unlink image from reports if referenced
-        # (set image_path to NULL)
-        if reports_with_image:
-            db.execute(
-                text("""
-                UPDATE reports
-                SET image_path = NULL
-                WHERE image_path
-                LIKE :path"""),
-                {"path": target_path_pattern}
-            )
-            db.commit()
-            db_msg = f" (Updated {len(reports_with_image)} DB record(s) to NULL)"
-        else:
-            db_msg = " (Unlinked temp file / test image)"
-
-        
-        # Delete the image file from directory
-        os.remove(file_path)
-        return {
-            "status": "success",
-            "message": f"{filename} deleted successfully"
-        }
-
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete file: {str(e)}"
-        )

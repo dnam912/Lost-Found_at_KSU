@@ -101,7 +101,7 @@ struct AuthView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                             Text(isCreatingAccount ? "Create your account" : "Welcome back")
                                 .font(.largeTitle.bold())
-                            Text("Sign in with your @kent.edu email to use KSU Lost & Found.")
+                            Text("Use an approved email address to sign in or create an account.")
                                 .foregroundStyle(.secondary)
                         }
 

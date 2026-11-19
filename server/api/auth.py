@@ -292,8 +292,8 @@ def get_current_user(
 ) -> AuthenticatedUser:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
-            status_code=401, 
-            detail="Authentication required.", 
+            status_code=401,
+            detail="Authentication required.",
             headers={"WWW-Authenticate": "Bearer"}
         )
 
@@ -312,8 +312,8 @@ def get_current_user(
 
     if row is None:
         raise HTTPException(
-            status_code=401, 
-            detail="Session is invalid or expired.", 
+            status_code=401,
+            detail="Session is invalid or expired.",
             headers={"WWW-Authenticate": "Bearer"}
         )
     return AuthenticatedUser(id=row["user_id"], email=row["email"])
@@ -332,7 +332,7 @@ def log_out(
 ) -> None:
     if credentials is None:
         raise HTTPException(
-            status_code=401, 
+            status_code=401,
             detail="Authentication required."
         )
     token_hash = hashlib.sha256(credentials.credentials.encode("utf-8")).hexdigest()

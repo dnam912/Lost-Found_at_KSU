@@ -5,6 +5,19 @@ import Security
 struct AuthUser: Decodable, Equatable {
     let id: String
     let email: String
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case userID = "user_id"
+        case email
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id)
+            ?? container.decode(String.self, forKey: .userID)
+        email = try container.decode(String.self, forKey: .email)
+    }
 }
 
 struct AuthTokens: Decodable {
@@ -18,6 +31,14 @@ struct AuthTokens: Decodable {
         case tokenType = "token_type"
         case expiresIn = "expires_in"
         case user
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        accessToken = try container.decode(String.self, forKey: .accessToken)
+        tokenType = try container.decodeIfPresent(String.self, forKey: .tokenType) ?? "bearer"
+        expiresIn = try container.decodeIfPresent(Int.self, forKey: .expiresIn) ?? 0
+        user = try container.decode(AuthUser.self, forKey: .user)
     }
 }
 

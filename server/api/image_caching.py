@@ -31,7 +31,7 @@ async def process_and_cache_image(
     db: Session
 ) -> tuple[str, str, Path]:
     """
-    Validates, hashes, checks DB duplicates in the images table, and saves image to disk.
+    Validates, hashes, checks DB duplicates in the reports table, and saves image to disk.
     Returns: (saved_image_path, file_hash, disk_path)
     """
     if not image.filename:
@@ -55,11 +55,11 @@ async def process_and_cache_image(
     file_hash = calculate_image_hash(contents)
 
 
-    # 3. Check duplicated image_hash in the images table (joined with reports for report_id)
+    # 3. Check for an existing report with this image hash.
     existing_record = db.execute(
         text("""
-            SELECT report_id, image_path 
-            FROM images 
+            SELECT id AS report_id, image_path
+            FROM reports
             WHERE image_hash = :hash
             LIMIT 1
         """),
